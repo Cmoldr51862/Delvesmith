@@ -71,6 +71,8 @@ textarea,input{user-select:text;-webkit-user-select:text}
 .r3{color:#ff9a3a}
 .chip.r3{border-color:#ff9a3a}
 .r0{color:#e2dccf}.r1{color:var(--magic)}.r2{color:var(--rare)}
+.row span.r0,.chip.r0{color:#e2dccf}.row span.r1,.chip.r1{color:var(--magic)}.row span.r2,.chip.r2{color:var(--rare)}.row span.r3,.chip.r3{color:#ff9a3a}
+.ipick{width:100%;display:flex;justify-content:space-between;align-items:center;gap:8px;background:#141219;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:inherit;font-weight:700;font-size:15px;text-align:left;cursor:pointer}.ipick small{color:var(--dim);font-weight:500}
 .slotrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px;border:1px solid var(--line);border-radius:10px;background:#191521;margin-bottom:6px}
 .slotrow .sl{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:1px}
 .slotrow .nm{font-weight:700;font-size:14px}
@@ -82,6 +84,7 @@ textarea,input{user-select:text;-webkit-user-select:text}
 .cur small{display:block;color:var(--dim);font-size:11px;margin-top:3px;line-height:1.3}
 .cur:disabled{opacity:.42}
 .cur.on{border-color:var(--accent);background:#2e2416}
+#invQ{background:#120f18;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:16px;min-width:0}
 select{width:100%;background:#120f18;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:15px}
 .recipe{border:1px solid var(--line);background:#191521;border-radius:12px;padding:11px;margin-bottom:8px}
 .rhead{display:flex;justify-content:space-between;align-items:center;gap:8px}
@@ -123,7 +126,7 @@ canvas{display:block;width:100%;height:100%}
 <body>
 
 <div id="town">
-  <div id="tabs"><button data-tab="run">Run</button><button data-tab="gear">Gear</button><button data-tab="tree">Tree</button><button data-tab="craft">Craft</button><button data-tab="refine">Town</button><button data-tab="guide">Guide</button></div>
+  <div id="tabs"><button data-tab="run">Run</button><button data-tab="gear">Gear</button><button data-tab="tree">Tree</button><button data-tab="refine">Town</button><button data-tab="guide">Guide</button></div>
   <div class="wrap" id="view"></div>
 </div>
 
@@ -169,23 +172,25 @@ const TYPES=['phys','poison','cold','fire'];
 const TCOL={phys:'#e8e2d6',poison:'#7ee36b',cold:'#8fd3ff',fire:'#ff9a4a'};
 const TNAME={phys:'Physical',poison:'Poison',cold:'Cold',fire:'Fire'};
 const BIOMES=[
-  {name:'The Mines',floors:'1–5',bg1:'#1d1720',bg2:'#2e211b',tile:'#4e3d30',top:'#7a5f45',speck:'#d9824a',enemy:'#7fd36f',ore:'#d9824a',
+  {name:'The Mines',floors:'1–4',bg1:'#1d1720',bg2:'#2e211b',tile:'#4e3d30',top:'#7a5f45',speck:'#d9824a',enemy:'#7fd36f',ore:'#d9824a',
    split:{phys:1},eres:{},oreMat:()=>'copper',mobMat:()=>'gel',walker:'Gel Slime',bat:'Cave Bat'},
-  {name:'Fungal Caves',floors:'6–10',bg1:'#0d1a1a',bg2:'#172a22',tile:'#2c463b',top:'#4e8a5c',speck:'#4fd1c5',enemy:'#4fd1c5',ore:'#4fd1c5',
+  {name:'Fungal Caves',floors:'5–9',bg1:'#0d1a1a',bg2:'#172a22',tile:'#2c463b',top:'#4e8a5c',speck:'#4fd1c5',enemy:'#4fd1c5',ore:'#4fd1c5',
    split:{phys:.5,poison:.5},eres:{poison:.6},oreMat:r=>r<.75?'glowcap':'copper',mobMat:r=>r<.7?'silk':'gel',walker:'Sporeling',bat:'Spore Moth'},
-  {name:'Crystal Depths',floors:'11–15',bg1:'#100d24',bg2:'#21173a',tile:'#36305a',top:'#7166c0',speck:'#c07bff',enemy:'#c07bff',ore:'#c07bff',
+  {name:'Crystal Depths',floors:'10–14',bg1:'#100d24',bg2:'#21173a',tile:'#36305a',top:'#7166c0',speck:'#c07bff',enemy:'#c07bff',ore:'#c07bff',
    split:{phys:.4,cold:.6},eres:{cold:.6,phys:.2},oreMat:r=>r<.8?'crystal':'glowcap',mobMat:r=>r<.5?'crystal':'silk',walker:'Shardling',bat:'Crystal Wisp'},
-  {name:'Magma Vents',floors:'16–20',bg1:'#1f0d0a',bg2:'#3a160c',tile:'#4a2a22',top:'#c4502a',speck:'#ff8a3a',enemy:'#ff7a3a',ore:'#ff8a3a',
+  {name:'Magma Vents',floors:'15–19',bg1:'#1f0d0a',bg2:'#3a160c',tile:'#4a2a22',top:'#c4502a',speck:'#ff8a3a',enemy:'#ff7a3a',ore:'#ff8a3a',
    split:{phys:.4,fire:.6},eres:{fire:.6,phys:.2},oreMat:r=>r<.8?'ember':'crystal',mobMat:r=>r<.6?'ember':'crystal',walker:'Cinder Imp',bat:'Ash Bat'},
-  {name:'The Abyss',floors:'21–25',bg1:'#08060f',bg2:'#140c22',tile:'#2a2040',top:'#4a3a70',speck:'#9a6aff',enemy:'#9a6aff',ore:'#c08aff',
+  {name:'The Abyss',floors:'20–24',bg1:'#08060f',bg2:'#140c22',tile:'#2a2040',top:'#4a3a70',speck:'#9a6aff',enemy:'#9a6aff',ore:'#c08aff',
    split:{phys:.25,poison:.25,cold:.25,fire:.25},eres:{phys:.1,fire:.2,cold:.2,poison:.2},oreMat:r=>r<.7?'voidshard':'ember',mobMat:r=>r<.45?'voidshard':r<.75?'crystal':'ember',walker:'Void Stalker',bat:'Void Eye'}
 ];
 const FMODS={hasted:{n:'Hasted',d:'Monsters move 30% faster',q:10},armored:{n:'Armored',d:'Monsters have 35% more Life',q:15},vicious:{n:'Vicious',d:'Monsters deal 25% more damage',q:15},
   volatile:{n:'Volatile',d:'Monsters explode when they die',q:12},regen:{n:'Regenerating',d:'Monsters regenerate 3% Life per second',q:10},swarming:{n:'Swarming',d:'Rooms hold extra monsters',q:20},
   spiteful:{n:'Spiteful',d:'Many more Spitters',q:12},trapped:{n:'Trapped',d:'Extra traps everywhere',q:10},champions:{n:'Champions',d:'Many more Champions',q:15},drained:{n:'Drained',d:'You cannot regenerate Life',q:15}};
 const FMK=Object.keys(FMODS);
-function abyssMods(floor){const out=[];const c=cycOf(floor);if(c>0){const r=mulberry32(c*4241+11),pool=[...FMK];for(let i=0;i<Math.min(3,c);i++)out.push(pool.splice(Math.floor(r()*pool.length),1)[0])}
-  if(floor>=10){const r=mulberry32(floor*977+3),n=Math.min(4,1+Math.floor((floor-10)/5)),pool=FMK.filter(k=>!out.includes(k));for(let i=0;i<n;i++)out.push(pool.splice(Math.floor(r()*pool.length),1)[0])}return out}
+const MILD=['trapped','spiteful','regen','volatile'],HEAVY=['champions','swarming','armored','vicious','hasted','drained'];
+function abyssMods(floor){const out=[];const c=cycOf(floor);if(c>0){const r=mulberry32(c*4241+11),pool=[...MILD];for(let i=0;i<Math.min(2,c);i++)out.push(pool.splice(Math.floor(r()*pool.length),1)[0])}
+  if(floor>=10){const r=mulberry32(floor*977+3),n=Math.max(0,Math.min(4,1+Math.floor((floor-10)/5))-out.length);let heavy=0;const pool=FMK.filter(k=>!out.includes(k));
+    for(let i=0;i<n&&pool.length;i++){let k=pool.splice(Math.floor(r()*pool.length),1)[0];if(HEAVY.includes(k)){if(heavy>=2){const alt=pool.filter(x=>!HEAVY.includes(x));if(!alt.length)break;k=alt[Math.floor(r()*alt.length)];pool.splice(pool.indexOf(k),1)}else heavy++}out.push(k)}}return out}
 function applyMods(L,e,rng){const M=L.modset;if(!M)return;if(M.armored){e.hp*=1.35;e.max*=1.35}if(M.vicious)e.dmg*=1.25;if(M.hasted)e.speed*=1.3;
   if(M.champions&&e.type==='walker'&&!e.champ&&rng()<.22){e.champ=true;e.hp*=2.6;e.max*=2.6;e.dmg*=1.5;e.w*=1.4;e.h*=1.4;e.name='Champion '+e.name}}
 const WCLASS={
@@ -304,14 +309,16 @@ function mkUnique(k,rand,ilvl){const U=UNIQ[k],it=newItem(U.base,Math.max(ilvl,B
 function mkMap(rand,floor,nmin){const pool=[...FMK],n=Math.min(4,(nmin||1)+Math.floor(rand()*3)),mods=[];for(let i=0;i<n;i++)mods.push(pool.splice(Math.floor(rand()*pool.length),1)[0]);
   return{mid:++S.uid,floor:Math.max(2,floor),mods,q:mods.reduce((a,m)=>a+FMODS[m].q,0)}}
 const SPITN=['Ooze Spitter','Spore Spitter','Frost Caster','Magma Spitter','Void Caster'];
-const bidxOf=f=>Math.floor((f-1)/5),cycOf=f=>Math.floor((f-1)/25),biomeOf=f=>bidxOf(f)%5;
+const bidxOf=f=>f<5?0:Math.floor(f/5),cycOf=f=>Math.floor((f-1)/25),biomeOf=f=>bidxOf(f)%5;
 const ROMAN=['I','II','III','IV','V','VI','VII','VIII','IX','X'],CYCN=['','Elder ','Ancient ','Primordial ','Eternal '];
 const cycName=f=>{const c=cycOf(f);return c?' '+(ROMAN[c]||('T'+(c+1))):''};
+const bsplit=f=>{const B=BIOMES[biomeOf(f)].split;if(!cycOf(f))return B;const A=BIOMES[4].split,o={};for(const k of TYPES)o[k]=(B[k]||0)*.5+(A[k]||0)*.5;return o};
 const bname=f=>BIOMES[biomeOf(f)].name+cycName(f);
 const mHP=f=>25*Math.pow(1.15,f-1)*Math.pow(1.2,bidxOf(f)),mDMG=f=>6*Math.pow(1.12,f-1)*Math.pow(1.15,bidxOf(f));
 const ramp=(f,k)=>Math.pow(k,Math.max(0,f-10)),wHP=f=>25*Math.pow(1.17,f-1)*Math.pow(1.2,bidxOf(f))*ramp(f,1.09),wDMG=f=>6*Math.pow(1.13,f-1)*Math.pow(1.17,bidxOf(f))*ramp(f,1.07);
 const danger=f=>Math.round(mHP(f)/25*10)/10;
-const checkpoints=()=>{const out=[];for(let f=1;f<=(S.cleared||0)+1;f+=5)out.push(f);return out};
+const bstart=b=>b<=0?1:b*5;
+const checkpoints=()=>{const out=[1];for(let f=5;f<=(S.cleared||0)+1;f+=5)out.push(f);return out};
 
 const EQ=['weapon','helmet','body','gloves','boots','belt','amulet','ring','ring2','backpack'];
 const SLOTN={weapon:'Weapon',helmet:'Helmet',body:'Body Armour',gloves:'Gloves',boots:'Boots',belt:'Belt',amulet:'Amulet',ring:'Ring',ring2:'Ring 2',backpack:'Backpack'};
@@ -422,7 +429,7 @@ const AFF={
 {const RM={1:1,2:4,3:6,4:9,6:14,8:20,12:25};var REMAP_T=RM}
 for(const k in AFF){const a=AFF[k],l=a.t[a.t.length-1],f=a.dec?10:1;a.t.push([12,Math.round(l[2]*1.15*f)/f,Math.round(l[2]*1.4*f)/f,a.p?'Abyssal':'of the Abyss'])}
 for(const k in AFF)for(const t of AFF[k].t)t[0]=REMAP_T[t[0]]||t[0];
-{const BM={1:1,2:3,3:6,4:8,5:11,6:13,7:16,10:21};for(const k in BASES)BASES[k].f=BM[BASES[k].f]||BASES[k].f}
+{const BM={1:1,2:3,3:6,4:8,5:11,6:13,7:16,10:20};for(const k in BASES)BASES[k].f=BM[BASES[k].f]||BASES[k].f}
 const rr=v=>`${Math.max(1,Math.round(v*.75))}–${Math.max(1,Math.round(v*1.25))}`;
 const DESC={addPhys:v=>`Adds ${rr(v)} Physical Damage`,incPhys:v=>`${v}% increased Physical Damage`,addFire:v=>`Adds ${rr(v)} Fire Damage`,addCold:v=>`Adds ${rr(v)} Cold Damage`,addPoison:v=>`Adds ${rr(v)} Poison Damage`,
   life:v=>`+${v} to maximum Life`,armour:v=>`+${v} to Armour`,incArmour:v=>`${v}% increased Armour`,ms:v=>`${v}% increased Movement Speed`,
@@ -461,7 +468,7 @@ let S;
 function newItem(base,ilvl){return{uid:++S.uid,base,slot:BASES[base].slot,ilvl,rarity:0,mods:[],name:''}}
 function defSave(){
   S={uid:0,flags:{},mats:{copper:10,gel:6},cur:{tinker:3,graft:2,crown:1},omen:{},inv:[],eq:{},charm:null,
-     set:{retreat:30,target:2,leaveFull:true,startFloor:1,autoSwap:true,descendHp:40,smart:true,idleLen:5},best:0,cleared:0,runs:0,idle:null,report:null,sel:null,tab:'run'};
+     set:{retreat:30,target:0,leaveFull:true,startFloor:1,autoSwap:true,descendHp:40,smart:true,idleLen:5},best:0,cleared:0,runs:0,idle:null,report:null,sel:null,tab:'run'};
   S.eq.weapon=newItem('shortsword',1);S.eq.body=newItem('vest',1);S.eq.backpack=newItem('pouch',1);S.v3=1;S.v4=1;S.v5=1;
   S.inv=[newItem('cap',1),newItem('wraps',1),newItem('ironring',1),newItem('handaxe',1),newItem('slippers',2),newItem('woolgloves',1),newItem('ropebelt',1),newItem('boneamulet',1),newItem('mallet',1),newItem('gnarledstaff',1),newItem('twinshivs',1),newItem('shortbow',1)];
   return S;
@@ -476,7 +483,8 @@ const IDB={db:null,open(){return this.db||(this.db=new Promise((res,rej)=>{try{c
 const saveSummary=x=>({at:x.savedAt||Date.now(),best:x.best||0,cleared:x.cleared||0,runs:x.runs||0,items:(x.inv||[]).length,lvl:x.lvl||1,prestige:x.prestige||0});
 const progressScore=x=>(x.prestige||0)*1e6+(x.cleared||0)*1e3+(x.runs||0);
 let idbReady=false,lastSnapAt=0,idbOK=null,persisted=null,staleTab=false,myWriteT=0;
-function migrate(){if(S.v4&&!S.v5){S.v5=1;S.inv.push(newItem('mallet',1),newItem('gnarledstaff',1),newItem('twinshivs',1),newItem('shortbow',1))}
+function migrate(){if(S.set)S.set.target=0;if(S.tab==='craft'){S.tab='refine';S.townTab='craft'}
+if(S.v4&&!S.v5){S.v5=1;S.inv.push(newItem('mallet',1),newItem('gnarledstaff',1),newItem('twinshivs',1),newItem('shortbow',1))}
 if(S.v3&&!S.v4){S.v4=1;S.inv.push(newItem('slippers',2))}
 if(S.cleared==null)S.cleared=Math.max(0,(S.best||0)-1);if(!S.set.startFloor)S.set.startFloor=1;if(S.set.autoSwap==null)S.set.autoSwap=true;if(S.set.descendHp==null)S.set.descendHp=40;if(S.set.smart==null)S.set.smart=true;if(S.set.idleLen==null)S.set.idleLen=5;if(!S.omen)S.omen={};if(!S.tree)S.tree={};if(!S.maps)S.maps=[];if(!S.town)S.town={};if(!S.prestige)S.prestige=0;for(const k in S.tree)if(!TREE.find(n=>n.id===k))delete S.tree[k];if(!S.lvl)S.lvl=1;if(S.xp==null)S.xp=0;if(!S.flags)S.flags={};if(!S.cur)S.cur={};if(!S.mats)S.mats={};if(!S.invCap)S.invCap=40;if(!S.shelves)S.shelves=0;
   if(!S.v3){S.v3=1;if(!S.eq.backpack)S.eq.backpack=newItem('pouch',1);S.inv.push(newItem('woolgloves',1),newItem('ropebelt',1),newItem('boneamulet',1))}}
@@ -602,10 +610,11 @@ function itemHTML(it,newMods){
      h+=`<br>Attacks per Second: ${aug(L.aps,L.apsAug)}<br>Critical Hit Chance: ${aug(L.crit+'%',L.critAug)}<br><span style="color:#a99fb8">Weapon DPS: ${L.dps}${(L.physAug||L.apsAug||L.fire||L.cold||L.poison)?` <small>(base ${Math.round((b.min+b.max)/2*b.aps*10)/10})</small>`:''}</span></div>`}
    if(L.armour&&(b.armour||L.armAug))h+=`<div class="iprop">Armour: ${aug(L.armour,L.armAug)}${L.armAug?` <small style="color:#a99fb8">(base ${(b.armour||0)+((b.imp&&b.imp.armour)||0)})</small>`:''}</div>`;}
   if(b.cls)h+=`<div class="note" style="margin-top:4px">Skills: ${WCLASS[b.cls].skills.map(k=>SKILLS[k].n).join(' · ')}</div>`;
-  if(b.imp){h+='<div class="ihr"></div>';for(const k in b.imp)h+=`<div class="imp">${DESC[k](b.imp[k])}</div>`}
+  const em=1+.05*(it.emp||0),ev=v=>em===1?v:(Math.abs(v*em)>=10?Math.round(v*em):Math.round(v*em*10)/10),eb=em>1?` <small style="color:#ffb070">(+${Math.round((em-1)*100)}%)</small>`:'';
+  if(b.imp){h+='<div class="ihr"></div>';for(const k in b.imp)h+=`<div class="imp">${DESC[k](ev(b.imp[k]))}${eb}</div>`}
   if(it.mods.length){h+='<div class="ihr"></div>';
     const ms=[...it.mods].sort((a,c)=>(isP(c)?1:0)-(isP(a)?1:0));
-    for(const m of ms)h+=`<div class="mod ${newMods&&newMods.includes(m)?'new':''}"><span class="tg">${tierLabel(m)}</span><span class="r1">${DESC[m.a](m.v)}${m.u?` <small style="color:#a99fb8">(${m.lo}–${m.hi})</small>`:''}</span></div>`}
+    for(const m of ms)h+=`<div class="mod ${newMods&&newMods.includes(m)?'new':''}"><span class="tg">${tierLabel(m)}</span><span class="r1">${DESC[m.a](ev(m.v))}${m.u?` <small style="color:#a99fb8">(${m.lo}–${m.hi})</small>`:''}${eb}</span></div>`}
   if(it.uq)h+=`<div class="ihr"></div><div style="color:#ff9a3a;font-style:italic">${UNIQ[it.uq].d}</div>`;
   return h+'</div>';
 }
@@ -696,8 +705,8 @@ function genFloor(rng,floor,extra,wk){
     for(let i=0;i<nW;i++){const p=pick(r,1);if(p)L.enemies.push(mkEnemy('walker',(p[0]+.5)*TS,(p[1]+.5)*TS,b,floor,rng,r.id))}
     if(rng()<(floor===1?.25:.45)){const p=pick(r,1);if(p)L.enemies.push(mkEnemy('bat',(p[0]+.5)*TS,(p[1]+.5)*TS,b,floor,rng,r.id))}
   }
-  if(floor%5===0||(extra&&extra.length)){const r=rooms[end],bx=(r.cx+.5)*TS,by=(Math.max(r.y,r.cy-2)+.5)*TS,bk=b===4?cycOf(floor)%4:b;L.boss=mkBoss(bk,floor,bx,by,end);if(b===4){L.boss.name='Abyssal '+L.boss.name;L.boss.hp*=1.25;L.boss.max=L.boss.hp;L.boss.dmg*=1.1}const cy=cycOf(floor);if(cy)L.boss.name=CYCN[Math.min(4,cy)]+L.boss.name;L.enemies.push(L.boss)}
-  if(floor%5===3&&order.length>2){const r=rooms[order[Math.floor(order.length/2)]];if(r.id!==0&&r.id!==end){const cx=(r.cx+.5)*TS,cy=(r.cy+.5)*TS,w=mkEnemy('walker',cx,cy,b,floor,rng,r.id);
+  if(floor%5===4||(extra&&extra.length)){const r=rooms[end],bx=(r.cx+.5)*TS,by=(Math.max(r.y,r.cy-2)+.5)*TS,bk=b===4?cycOf(floor)%4:b;L.boss=mkBoss(bk,floor,bx,by,end);if(b===4){L.boss.name='Abyssal '+L.boss.name;L.boss.hp*=1.25;L.boss.max=L.boss.hp;L.boss.dmg*=1.1}const cy=cycOf(floor);if(cy)L.boss.name=CYCN[Math.min(4,cy)]+L.boss.name;L.enemies.push(L.boss)}
+  if(floor%5===2&&floor>2&&order.length>2){const r=rooms[order[Math.floor(order.length/2)]];if(r.id!==0&&r.id!==end){const cx=(r.cx+.5)*TS,cy=(r.cy+.5)*TS,w=mkEnemy('walker',cx,cy,b,floor,rng,r.id);
     w.champ=true;w.warden=1;w.hp*=6;w.max=w.hp;w.dmg*=2;w.w=34;w.h=32;w.x=cx-17;w.y=cy-16;w.name='Warden '+BIOMES[b].walker;L.enemies.push(w);
     for(let i=0;i<2;i++){const a=i*Math.PI;L.enemies.push(mkEnemy('walker',cx+Math.cos(a)*44,cy+Math.sin(a)*30,b,floor,rng,r.id))}
     L.chests.push({x:cx-13+40,y:cy-10+30,w:26,h:20,open:false,room:r.id,warden:1})}}
@@ -786,7 +795,7 @@ class Sim{
   dropMat(k,n){n=Math.min(n,this.bag[k]||0);this.bag[k]-=n;this.recount();this.dropped+=n}
   dropItem(uid){const i=this.items.findIndex(it=>it.uid===uid);if(i>=0){this.items.splice(i,1);this.recount();this.dropped++}}
   mats(mat,base,x,y){const m=base*(1+this.st.lootFind/100)*(1+(this.L.lootQ||0)/100)*(1+.02*(this.floor-1));let n=Math.floor(m);if(this.rng()<m-n)n++;for(let i=0;i<n;i++)this.addLoot('mat',mat,x+(i-n/2)*6,y-i*8)}
-  mitig(raw){const st=this.st,sp=BIOMES[this.L.b].split;let t=0;for(const k of TYPES){const sh=sp[k]||0;if(!sh)continue;const rv=raw*sh;t+=k==='phys'?rv*(1-Math.min(.9,st.armour/(st.armour+5*rv))):rv*(1-st.res[k]/100)}return t}
+  mitig(raw){const st=this.st,sp=bsplit(this.floor);let t=0;for(const k of TYPES){const sh=sp[k]||0;if(!sh)continue;const rv=raw*sh;t+=k==='phys'?rv*(1-Math.min(.9,st.armour/(st.armour+5*rv))):rv*(1-st.res[k]/100)}return t}
   calcEff(){const st=this.st,er=BIOMES[this.L.b].eres,cf=1+Math.min(1,st.crit/100)*(st.critMulti/100-1);
     this.effDps=Math.max(.5,st.physDps*(1-(er.phys||0))+(['fire','cold','poison'].reduce((a,k)=>a+st.ele[k]*(1-(er[k]||0)),0))*st.aps*cf*(1+((st.wclass==='staff'?st.spellDmg:st.attackDmg)||0)/100)*(1+(st.eleDmg||0)/100))}
   roll(a,b){let h=(Math.imul(this.seed^0x9e3779b9,a*374761393+b*668265263+this.floor*2246822519)>>>0);h=Math.imul(h^(h>>>15),2246822519)>>>0;h^=h>>>13;return (h>>>0)/4294967296}
@@ -924,7 +933,7 @@ class Sim{
     if(melee&&this.buff.smoke>0){this.fx(this.P.x+9,this.P.y-10,'Miss','#cfc6dc');return}
     if(melee&&(this.st.u||{}).phantom&&this.rng()*100<(this.st.dodge||0)/2){this.fx(this.P.x+9,this.P.y-10,'Evaded','#8fd3ff');return}
     const dm=(this.buff.guard>0?.5:1)*(this.buff.iron>0?.6:1)*(this.st.unbreak?.85:1);
-    const st=this.st,sp=split||BIOMES[this.L.b].split;let tot=0,parts=[];
+    const st=this.st,sp=split||bsplit(this.floor);let tot=0,parts=[];
     for(const k of TYPES){const sh=sp[k]||0;if(!sh)continue;const rv=raw*sh;
       const tk=dm*(k==='phys'?rv*(1-Math.min(.9,st.armour/(st.armour+5*rv))):rv*(1-st.res[k]/100));
       this.taken[k]+=tk;tot+=tk;parts.push([k,tk])}
@@ -960,11 +969,11 @@ class Sim{
         this.addLoot('item',genItem(this.rng,this.floor,.9,this.L.wk),x,y);this.addLoot('item',genItem(this.rng,this.floor,.6,this.L.wk),x,y);
         if(this.rng()<.7)this.addLoot('mat','starmetal',x,y);if(this.floor>=5)this.addLoot('mat','starmetal',x,y);
         const pool=this.L.b===4?UQK:UQK.filter(k=>UNIQ[k].src.includes(e.bk));if(this.rng()<(this.L.b===4?.35:.2)){const u=mkUnique(pool[Math.floor(this.rng()*pool.length)],this.rng,this.floor);this.addLoot('item',u,x,y);this.logm(`UNIQUE: ${u.name}!`,'#ff9a3a');this.banner={text:`★ ${u.name} ★`,t:3}}
-        this.gainMap(mkMap(this.rng,this.floor+(this.rng()<.5?1:0),1));
+        if(this.rng()<.3)this.gainMap(mkMap(this.rng,this.floor+(this.rng()<.5?1:0),1));
         this.L.enemies.forEach(m=>{if(m.summoned)m.hp=0});return}
       this.pfx(x,e.y+e.h/2,B.enemy,14,170);
       this.mats(B.mobMat(this.rng()),e.type==='bat'?.6:1,x,y);
-      if(e.champ&&this.floor>=3&&this.rng()<.06)this.gainMap(mkMap(this.rng,this.floor,1));
+      if(e.champ&&this.floor>=3&&this.rng()<.015)this.gainMap(mkMap(this.rng,this.floor,1));
       if(e.champ&&this.L.b===4&&this.rng()<.02){const u=mkUnique(UQK[Math.floor(this.rng()*UQK.length)],this.rng,this.floor);this.addLoot('item',u,x,y);this.logm(`UNIQUE: ${u.name}!`,'#ff9a3a')}
       if(e.champ){this.logm(`Slew a ${e.name}`,'#ffd36a');this.mats(B.oreMat(this.rng()),2,x,y);if(this.rng()<.5)this.addLoot('item',genItem(this.rng,this.floor,.6,this.L.wk),x,y);if(this.floor>=3&&this.rng()<.25)this.addLoot('mat','starmetal',x,y)}
       if(this.floor>=8&&this.rng()<.015+.0005*this.floor){const pool=['tinker','tinker','graft','graft','crown','chaos','chaos','void','scour','ascend','divine'],k=pool[Math.floor(this.rng()*pool.length)];(this.curDrops=this.curDrops||{})[k]=(this.curDrops[k]||0)+1;this.fx(x,y-24,'+1 '+CUR[k].n,'#ffb070')}
@@ -1124,7 +1133,7 @@ class Sim{
       const n=3+Math.floor(s.rng()*3);for(let i=0;i<n;i++)s.mats(s.rng()<.55?B.oreMat(s.rng()):B.mobMat(s.rng()),1,x,y);
       if(s.rng()<(st.treasure?.27:.18)||c.warden)s.addLoot('item',genItem(s.rng,s.floor,c.warden?.7:.3,s.L.wk),x,y);if(c.warden){s.addLoot('mat','starmetal',x,y);s.logm('Opened the Warden\'s chest!','#ffd36a')}
       if(s.floor>=3&&s.rng()<.3)s.addLoot('mat','starmetal',x,y);
-      if(s.floor>=4&&s.rng()<.04)s.gainMap(mkMap(s.rng,s.floor,1));
+      if(s.floor>=4&&s.rng()<.01)s.gainMap(mkMap(s.rng,s.floor,1));
     }
     if(s.visual){
       for(const q of L.parts){q.life-=dt;q.vy+=300*dt;q.x+=q.vx*dt;q.y+=q.vy*dt}L.parts=L.parts.filter(q=>q.life>0);
@@ -1232,12 +1241,19 @@ function applyResult(res,charm){
   const ups=gainXP((res.xp||0)*(1+.1*(S.town.training||0)));S.bossKills=(S.bossKills||0)+(res.bosses||0);
   const rep=Object.assign({},res,{levelUps:ups,newLvl:S.lvl,keptMats,lostMats,keptItems,lostItems,lostUnits,charmName:charm?charm.n:null,charmSave:charm?charm.save:0});
   delete rep.log;delete rep.items;rep.logTail=res.log.slice(-14);
-  S.report=rep;persist();snapNow();backupPrompt();return rep;
+  S.report=rep;persist();snapNow();backupPrompt();empIntro();updTabDots();return rep;
 }
 function salvageMats(it){const b=biomeOf(it.ilvl),sets=[['copper','gel'],['glowcap','silk'],['crystal','silk'],['ember','crystal'],['voidshard','ember']][b],n=1+it.rarity+Math.floor(it.ilvl/3),o={};for(let i=0;i<n;i++){const k=sets[i%2];o[k]=(o[k]||0)+1}return o}
 
 // ================= TOWN VIEWS =================
-function setTab(t){S.tab=t;persist();document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));render();$('#town').scrollTop=0}
+function setTab(t){if(t==='craft'){t='refine';S.townTab='craft'}S.tab=t;persist();document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));updTabDots();render();$('#town').scrollTop=0}
+function updTabDots(){const b=document.querySelector('#tabs [data-tab=refine]');if(b)b.innerHTML='Town'+(!(S.flags||{}).empSeen&&(S.best||0)>=2?'<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#ff9a3a;margin-left:4px;vertical-align:top"></span>':'')}
+function goEmpower(uid){S.sel=uid;S.townTab='emp';setTab('refine');setTimeout(()=>{const c=document.getElementById('empCard');if(c){c.scrollIntoView({block:'center'});c.style.boxShadow='0 0 0 2px #ff9a3a';setTimeout(()=>c.style.boxShadow='',1800)}},60)}
+function empIntro(tries){tries=tries||0;clearTimeout(empIntro.t);if((S.flags||{}).empIntro||(S.best||0)<2||!S.eq.weapon)return;
+  if(mode!=='town'||!$('#modal').classList.contains('hidden')){if(tries<120)empIntro.t=setTimeout(()=>empIntro(tries+1),1300);return}
+  S.flags.empIntro=1;persist();const w=S.eq.weapon;
+  modal('New: Empower your gear',`Any item can be <b>Empowered</b> in Town → Empowering. Each level adds <b>+5% to all of its stats</b> and there's no cap. It costs Crystal Shards (and rarer materials at higher levels) and can fail, but a failed try never harms the item.<br><br>Empowered items show as <b style="color:#ffb070">+1, +2…</b> in front of their name.`,
+    [{label:`Empower my ${SLOTN.weapon.toLowerCase()} now`,fn:()=>goEmpower(w.uid)},{label:'Later',cls:'ghost'}])}
 document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
 function viewTree(){
   const pts=treePts(),need=xpNeed(S.lvl||1),tab=S.treeTab==null?0:S.treeTab,wcl=computeStats(S.eq).wclass;
@@ -1295,13 +1311,17 @@ function nodeModal(n){
   if(S.idle)b+=`<div class="note warn" style="margin-top:6px">The tree is locked while an expedition is running.</div>`;
   modal(n.n,b,[{label:rk>=n.max?'Maxed':'Spend a point',disabled:!can,fn:()=>{S.tree[n.id]=rk+1;persist();viewTree();toast(`${n.n} ${n.max>1?`rank ${rk+1}`:'unlocked'}!`)}},{label:'Close',cls:'ghost'}]);
 }
-function render(){({run:viewRun,gear:viewGear,tree:viewTree,craft:viewCraft,refine:viewRefine,guide:viewGuide})[S.tab||'run']();tutTick()}
+const TT=[['craft','Crafting'],['emp','Empowering'],['refine','Refining'],['build','Upgrades']];
+function hubBar(){const t=S.townTab||'craft',dot=!(S.flags||{}).empSeen&&(S.best||0)>=2;return `<h1>TOWN</h1><div class="chips" style="margin:0 0 12px;gap:6px;flex-wrap:wrap">${TT.map(([k,n])=>`<button class="btn small ${t===k?'':'ghost'}" data-tt="${k}" style="width:auto;flex:1;min-width:0;padding:8px 2px;font-size:12px;white-space:nowrap">${n}${k==='emp'&&dot?'<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#ff9a3a;margin-left:4px;vertical-align:top"></span>':''}</button>`).join('')}</div>`}
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-tt]');if(!b)return;S.townTab=b.dataset.tt;persist();render();$('#town').scrollTop=0});
+function viewHub(){const t=S.townTab||'craft';if(t==='craft'||t==='emp')viewCraft();else viewTown()}
+function render(){if(S.tab==='craft'){S.tab='refine';S.townTab='craft'}({run:viewRun,gear:viewGear,tree:viewTree,refine:viewHub,guide:viewGuide})[S.tab||'run']();tutTick()}
 const TUT=[
   {id:'run',t:'Send your first run',d:'On the Run tab, tap <b>Single run</b> and watch your runner fight, mine ore and grab loot. It comes back automatically.',tab:'run',sel:'#liveBtn',done:()=>S.runs>0},
-  {id:'refine',t:'Refine a Tinker Orb',d:'Materials become crafting currency. On the Town tab, make a <b>Tinker Orb</b> from Copper Ore.',tab:'refine',sel:'[data-make="cur:tinker:1"]',done:()=>S.flags.refined},
-  {id:'craft',t:'Craft on your gear',d:'On the Craft tab, pick an item and use a <b>Tinker Orb</b> to give a plain (Normal) item its first modifier.',tab:'craft',sel:'[data-cur]:not([disabled])',done:()=>S.flags.crafted},
+  {id:'refine',t:'Refine a Tinker Orb',d:'Materials become crafting currency. On the Town tab, open <b>Refining</b> and make a <b>Tinker Orb</b> from Copper Ore.',tab:'refine',tt:'refine',sel:'[data-make="cur:tinker:1"]',done:()=>S.flags.refined},
+  {id:'craft',t:'Craft on your gear',d:'On the Town tab, open <b>Crafting</b>, pick an item and use a <b>Tinker Orb</b> to give a plain (Normal) item its first modifier.',tab:'refine',tt:'craft',sel:'[data-cur]:not([disabled])',done:()=>S.flags.crafted},
   {id:'equip',t:'Fill an empty gear slot',d:"On the Gear tab, tap an item in your inventory and <b>Equip</b> it. Dancer's Slippers give Hazard Dodge, which teaches the runner to sidestep puddles and traps.",tab:'gear',sel:'#invCard [data-item]',done:()=>S.flags.equipped},
-  {id:'charm',t:'Make a charm',d:'If the runner dies it loses its whole bag. A <b>Cracked Charm</b> (Town tab) saves 25% of it once.',tab:'refine',sel:'[data-make^="charm:cracked"]',done:()=>S.flags.charm||S.charm},
+  {id:'charm',t:'Make a charm',d:'If the runner dies it loses its whole bag. A <b>Cracked Charm</b> (Town → Refining) saves 25% of it once.',tab:'refine',tt:'refine',sel:'[data-make^="charm:cracked"]',done:()=>S.flags.charm||S.charm},
   {id:'idle',t:'Start an idle expedition',d:'Expeditions run back-to-back for up to 8 hours while you are away. Tap <b>Idle expedition</b> on the Run tab. You can watch it live anytime.',tab:'run',sel:'#idleBtn',done:()=>S.flags.expedition},
   {id:'backup',t:'Back up your progress',d:'Tap <b>Save backup file</b> on the Run tab and keep the file somewhere safe (Files, Drive or email).',tab:'run',sel:'#fileBtn',done:()=>!!S.backupAt}
 ];
@@ -1311,7 +1331,7 @@ function tutTick(){
   if(!st||$('#town').classList.contains('hidden')){bar.classList.add('hidden');return}
   const n=TUT.indexOf(st)+1;bar.classList.remove('hidden');
   bar.innerHTML=`<div style="flex:1;min-width:0"><div class="note" style="color:var(--accent)">Getting started · ${n}/${TUT.length}</div><b style="font-size:14px">${st.t}</b><div class="note" style="margin-top:2px">${st.d}</div></div><div style="display:flex;flex-direction:column;gap:6px"><button class="btn small" id="tutGo">Show me</button><button class="btn small ghost" id="tutHide">Hide</button></div>`;
-  $('#tutGo').onclick=()=>{if(S.tab!==st.tab)setTab(st.tab);setTimeout(()=>{const el=document.querySelector(st.sel);if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.classList.remove('pulse');void el.offsetWidth;el.classList.add('pulse')}else toast('Not available right now. Finish what the runner is doing first.')},60)};
+  $('#tutGo').onclick=()=>{if(st.tt&&S.townTab!==st.tt){S.townTab=st.tt;if(S.tab===st.tab)render()}if(S.tab!==st.tab)setTab(st.tab);setTimeout(()=>{const el=document.querySelector(st.sel);if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.classList.remove('pulse');void el.offsetWidth;el.classList.add('pulse')}else toast('Not available right now. Finish what the runner is doing first.')},60)};
   $('#tutHide').onclick=()=>{S.tutOff=1;persist();tutTick();toast('Tutorial hidden. You can turn it back on in the Guide tab.')};
   if(S.tutLast!==st.id){if(S.tutLast&&S.tutLast!==st.id)toast('Step complete!');S.tutLast=st.id;persist()}
 }
@@ -1344,10 +1364,10 @@ function viewGuide(){
     <li><b>Falling rocks</b> (depth 3+) come down during fights. A shadow shows where they'll land a second before they hit.</li></ul>
     <p style="margin:8px 0 0"><b>Hazard Dodge</b> (you have ${st.dodge}%) makes the runner smarter around traps. It's the chance to sidestep a puddle or falling rocks, dodge a dart, <b>wait for spikes and vents</b> to go down before crossing, and <b>spot hidden snares</b> (they show as a red X and get walked around). With 0% the runner just walks into everything. Get it from boots (Cloth Wraps, Dancer's Slippers, Strider Boots) and from "of the Hare/Fox/Cat…" suffixes on boots, gloves, helmets, amulets and belts. It caps at 80%.</p>`);
   h+=sec('Weapons and skills',`<p style="margin:0 0 8px">Every weapon type attacks differently and has <b>3 skills</b>. In a <b>single run</b> you tap the skill buttons yourself. In <b>idle expeditions</b> the runner casts them automatically when they make sense. Skills hit harder as your weapon gets better.</p>${Object.keys(WCLASS).map(c=>`<div class="row" style="display:block"><b>${WCLASS[c].n}${WCLASS[c].range?' (ranged)':''}</b>${WCLASS[c].skills.map(k=>`<div class="note"><b style="color:#ffe2b0">${SKILLS[k].n}</b> (${SKILLS[k].cd}s): ${SKILLS[k].d}</div>`).join('')}</div>`).join('')}`);
-  h+=sec('Bosses',`<p style="margin:0 0 8px">Every 5th floor (5, 10, 15…) ends with the biome's boss guarding the exit, and the 3rd floor of each biome has a <b>Warden</b>: a huge Champion with guards and a bonus chest. The exit and stairs stay <b>sealed</b> until it falls. Bosses telegraph their big attacks with red circles (Hazard Dodge helps), get <b>enraged</b> at half Life, and drop 2 items, piles of materials, Starmetal and a lot of XP.</p>${BOSSN.map((n,i)=>`<div class="row" style="display:block"><b>${n}</b> <span class="note">(${BIOMES[i].name})</span><div class="note">${BOSSKIT[i].map(a=>a.n).join(' · ')}${i===0?' · splits into slimes when enraged':''}</div></div>`).join('')}`);
+  h+=sec('Bosses',`<p style="margin:0 0 8px">The last floor of each biome (4, 9, 14, 19…) ends with the biome's boss guarding the exit, and the 3rd floor of each biome (7, 12, 17…) has a <b>Warden</b>: a huge Champion with guards and a bonus chest. The exit and stairs stay <b>sealed</b> until it falls. Bosses telegraph their big attacks with red circles (Hazard Dodge helps), get <b>enraged</b> at half Life, and drop 2 items, piles of materials, Starmetal and a lot of XP.</p>${BOSSN.map((n,i)=>`<div class="row" style="display:block"><b>${n}</b> <span class="note">(${BIOMES[i].name})</span><div class="note">${BOSSKIT[i].map(a=>a.n).join(' · ')}${i===0?' · splits into slimes when enraged':''}</div></div>`).join('')}`);
   h+=sec('Levels and the skill tree',`<p style="margin:0">Every kill gives XP: more on deeper floors, 5× for Champions and 30× for bosses. XP is kept <b>even if the runner dies</b>. Each level gives 1 point for the <b>Tree</b> tab, which has five sections: <span style="color:#ff8a6a">Might</span> (attack damage for every weapon except staves), <span style="color:#b48cff">Sorcery</span> (spell damage for staves, plus elemental damage), <span style="color:#8fb0ff">Fortitude</span> (defense), <span style="color:#7ee36b">Cunning</span> (dodge, speed, loot and cooldowns) and <span style="color:#ffd36a">Weapons</span>. In Weapons, each weapon type has a Mastery, an Adept node, and three ✦ nodes that change how its skills work, like Split Fire turning Fireball into 3 orbs. Weapon nodes only work while that weapon is equipped. There are far more nodes than points, so pick a build. You can reset the tree for a few materials.</p>`);
-  h+=sec('Endgame: the Abyss, maps, uniques',`<p style="margin:0 0 8px"><b>Endless depth:</b> every 5 floors is a new biome, and after the Abyss (21–25) the biomes loop as <b>Tier II, III…</b> with Elder and Ancient monsters and permanent modifiers. Monsters get stronger every floor and again at every biome change. The <b>Danger</b> number shows how much. From depth 10 floors roll modifiers like Hasted or Volatile, with one more every 5 floors, plus bigger loot. Deeper floors drop more materials and items, and from depth 8 monsters sometimes drop crafting currency directly. The top modifier tier (T1) needs item level 20, <b>Abyssal</b> needs item level 25, and Void bases drop from depth 21. <b>Empower</b> any item in the Craft tab for an endless +5% per level.</p>
-    <p style="margin:0 0 8px"><b>Delve Maps</b> drop from every boss, and sometimes from deep Champions and chests. A map is one floor with 1–4 modifiers you choose to take on for more loot and XP, and it always ends in a boss. Run them from the Run tab, and reroll a bad roll for a few materials.</p>
+  h+=sec('Endgame: the Abyss, maps, uniques',`<p style="margin:0 0 8px"><b>Endless depth:</b> a new biome starts at every multiple of 5 (the Mines are the short first one, depths 1–4). Checkpoints sit at depth 1, 5, 10, 15… After the Abyss (20–24) the biomes loop as <b>Tier II, III…</b> with Elder and Ancient monsters and permanent modifiers. Monsters get stronger every floor and again at every biome change. The <b>Danger</b> number shows how much. From depth 10 floors roll modifiers like Hasted or Volatile, with one more every 5 floors, plus bigger loot. Deeper floors drop more materials and items, and from depth 8 monsters sometimes drop crafting currency directly. The top modifier tier (T1) needs item level 20, <b>Abyssal</b> needs item level 25, and Void bases drop from depth 20. <b>Empower</b> any item in Town → Empowering for an endless +5% per level.</p>
+    <p style="margin:0 0 8px"><b>Delve Maps</b> are rare: bosses drop one about a third of the time, and deep Champions and chests very rarely. Clear a map and you <b>choose one of three rewards</b> (unique item, rare gear, currency, Empowering materials or a deeper map). More modifiers mean bigger rewards. A map is one floor with 1–4 modifiers you choose to take on for more loot and XP, and it always ends in a boss. Run them from the Run tab, and reroll a bad roll for a few materials.</p>
     <p style="margin:0"><b>Unique items</b> (orange) have fixed modifiers and an effect that shapes your build. Each boss has its own drops, and Abyss bosses can drop any of them. Uniques can't be crafted, but Divine Dust rerolls their values.</p>${UQK.map(k=>`<div class="row" style="display:block"><b style="color:#ff9a3a">${UNIQ[k].n}</b> <span class="note">(${BASES[UNIQ[k].base].n} · ${UNIQ[k].src.map(i=>i===4?'Abyss bosses':BOSSN[i]).join(', ')})</span><div class="note">${UNIQ[k].d}</div></div>`).join('')}`);
   h+=sec('Town, prestige and the weekly challenge',`<p style="margin:0 0 8px"><b>Town buildings</b> are where spare materials go: the Refinery makes refining cheaper, the Smithy improves crafting rolls, Training Grounds add XP, and the Runner Lodge shortens rest between expedition runs.</p>
     <p style="margin:0 0 8px"><b>Prestige:</b> at level 60, Ascend back to level 1 for a permanent +3% damage and Life each time, plus a title.</p>
@@ -1358,7 +1378,7 @@ function viewGuide(){
     <li><b>Rarity:</b> <span class="r0">Normal</span> has no modifiers, <span class="r1">Magic</span> has up to 1 prefix and 1 suffix, and <span class="r2">Rare</span> has up to 3 of each.</li>
     <li><b>Tiers:</b> labels like P3 or S1 mean prefix tier 3 or suffix tier 1. <b>Tier 1 is the best.</b></li>
     <li>Weapon damage, speed and crit modifiers change the weapon's own numbers, shown in blue. Armour modifiers do the same on armour.</li>
-    <li>Salvage gear you don't need for materials. Use <b>Select</b> on the Gear tab to salvage many at once.</li></ul>`);
+    <li>Salvage gear you don't need for materials. Use <b>Select</b> on the Gear tab to salvage many at once. Tap an item and choose <b>Favorite</b> to protect it: favorites (★) can never be salvaged.</li></ul>`);
   h+=sec('Crafting currency',`${CKEYS.map(k=>`<div class="row" style="display:block"><b>${CUR[k].n}</b><div class="note">${CUR[k].d}</div></div>`).join('')}
     <p style="margin:8px 0 0"><b>A typical path:</b> Tinker (Normal to Magic), then Graft, then Crown (to Rare), then Ascension to fill it. Use Chaos or Void to reroll bad modifiers, and Seals to protect the good half. Essences make a Rare with one guaranteed modifier, which is great for resistances.</p>`);
   h+=sec('Materials',`${MKEYS.map(k=>`<div class="row"><span style="text-align:left;color:${MATS[k].c}">${MATS[k].n}</span><span>${{copper:'Mines ore',gel:'Mines monsters',glowcap:'Fungal ore',silk:'Fungal monsters',crystal:'Crystal Depths',ember:'Magma Vents',starmetal:'Chests, Champions and bosses, floor 3+',voidshard:'The Abyss, floor 9+'}[k]}</span></div>`).join('')}`);
@@ -1369,7 +1389,7 @@ function viewGuide(){
 
 function viewRun(){
   const st=computeStats(S.eq),s=S.set;{const cp=checkpoints();s.startFloor=cp.filter(f=>f<=(s.startFloor||1)).pop()||1}let h=`<h1>DELVESMITH</h1><div class="sub">Craft the gear. Send the runner. Don't die with a full bag.</div>`;
-  {const nb=(S.best||0)+1;h+=`<div class="card" style="display:flex;justify-content:space-between;align-items:center;background:linear-gradient(135deg,#2a1f16,var(--panel))"><div><div class="note" style="letter-spacing:1.5px">DEEPEST DEPTH</div><div style="font-size:40px;font-weight:900;color:#ffe2b0;line-height:1.05">${S.best||0}</div><div class="note">${S.best?bname(S.best):'Not started'}</div></div><div style="text-align:right"><div class="note">NEXT BIOME</div><b>${bname(Math.ceil(nb/5)*5+1)}</b><div class="note">at depth ${Math.ceil(nb/5)*5+1}</div><div class="note" style="margin-top:4px">Danger at ${nb}: ×${danger(nb)}</div></div></div>`}
+  {const nb=(S.best||0)+1;h+=`<div class="card" style="display:flex;justify-content:space-between;align-items:center;background:linear-gradient(135deg,#2a1f16,var(--panel))"><div><div class="note" style="letter-spacing:1.5px">DEEPEST DEPTH</div><div style="font-size:40px;font-weight:900;color:#ffe2b0;line-height:1.05">${S.best||0}</div><div class="note">${S.best?bname(S.best):'Not started'}</div></div><div style="text-align:right"><div class="note">NEXT BIOME</div><b>${bname(bstart(bidxOf(nb)+1))}</b><div class="note">at depth ${bstart(bidxOf(nb)+1)}</div><div class="note" style="margin-top:4px">Danger at ${nb}: ×${danger(nb)}</div></div></div>`}
   if(cloudState!=='on'&&S.runs-(S.backupRuns||0)>=5)h+=`<div class="advice" style="margin:0 0 12px;display:flex;align-items:center;gap:10px"><span style="flex:1">${S.backupAt?`${S.runs-(S.backupRuns||0)} runs since your last backup.`:"You haven't saved a backup file yet."}</span><button class="btn small" id="nudgeBtn">Save backup</button></div>`;
   if(S.idle){
     const I=S.idle,el=idleElapsed(),cur=idlePending&&idlePending.i===I.runs.length?idlePending.r:null,seen=cur?cur.log.filter(l=>l.t<=el-I.doneT):[];
@@ -1388,7 +1408,7 @@ function viewRun(){
       <div class="set"><div>Start at checkpoint<small>Every biome start you reach unlocks (${checkpoints().join(', ')})</small></div><div class="step"><button data-st="startFloor" data-d="-1">−</button><b>${s.startFloor}<small style="display:block;font-size:10px;color:var(--dim);font-weight:600">${bname(s.startFloor)}</small></b><button data-st="startFloor" data-d="1">+</button></div></div>
       <div class="set"><div>Retreat at HP<small>Mid-floor: turn back to the entrance below this.</small></div><div class="step"><button data-st="retreat" data-d="-10">−</button><b>${s.retreat?s.retreat+'%':'Never'}</b><button data-st="retreat" data-d="10">+</button></div></div>
       <div class="set"><div>Go deeper only above<small>At the end of a floor, take the exit if HP is below this. Each new floor heals 25%.</small></div><div class="step"><button data-st="descendHp" data-d="-10">−</button><b>${s.descendHp?s.descendHp+'%':'Always'}</b><button data-st="descendHp" data-d="10">+</button></div></div>
-      <div class="set"><div>Target floor<small>Take the exit after beating this floor.</small></div><div class="step"><button data-st="target" data-d="-1">−</button><b>${s.target||'No limit'}</b><button data-st="target" data-d="1">+</button></div></div>
+
       <div class="set"><div>Leave when bag is full<small>Bag holds ${st.bag}</small></div><button class="toggle ${s.leaveFull?'on':''}" id="tglFull"></button></div>
       <div class="set"><div>Swap out junk when full<small>Drops the least valuable thing in the bag to grab something better</small></div><button class="toggle ${s.autoSwap?'on':''}" id="tglSwap"></button></div>
       <div class="set"><div>Expedition length<small>Idle mode: back-to-back runs while you're away</small></div><div class="step"><button data-st="idleLen" data-d="-1">−</button><b>${IDLE_LBL[s.idleLen]}</b><button data-st="idleLen" data-d="1">+</button></div></div>
@@ -1454,11 +1474,25 @@ function updIdleCard(){
   $('#idleNow').textContent=idleNowText();$('#idleSoFar').textContent=soFarText();$('#idleLog').innerHTML=logLines(seen);
 }
 
+const SORTS={recent:'Newest first',old:'Oldest first',rarity:'Rarity',ilvl:'Item level',dps:'Highest DPS (weapons)',armour:'Highest armour',slot:'Slot',fav:'Favorites first',emp:'Empower level'};
+let invQ='';
+const RNAME=['normal','magic','rare','unique'];
+function itemText(it){const b=BASES[it.base];let t=[itemName(it),b.n,SLOTN[it.slot],RNAME[it.rarity],b.cls||'',it.fav?'favorite':'',it.emp?'empowered':''];
+  if(b.imp)for(const k in b.imp)t.push(DESC[k](b.imp[k]));for(const m of it.mods)t.push(DESC[m.a](m.v));if(it.uq)t.push(UNIQ[it.uq].n||'',UNIQ[it.uq].d);
+  return t.join(' ').replace(/<[^>]*>/g,'').toLowerCase()}
+function invMatch(it){const q=invQ.trim().toLowerCase();if(!q)return true;const t=itemText(it);return q.split(/\s+/).every(w=>t.includes(w))}
+function applyInvFilter(){const card=document.getElementById('invCard');if(!card)return;let n=0;
+  card.querySelectorAll('[data-iu]').forEach(el=>{const it=S.inv.find(i=>i.uid===+el.dataset.iu);const ok=it&&invMatch(it);el.style.display=ok?'':'none';if(ok)n++});
+  const c=document.getElementById('invCount');if(c)c.textContent=invQ.trim()?`${n} match${n===1?'':'es'}`:''}
+function sortedInv(){const k=S.invSort||'recent',a=S.inv.map((it,i)=>({it,i}));const ls=it=>{try{return localStats(it)}catch(e){return{}}};
+  const by={recent:x=>-x.i,old:x=>x.i,rarity:x=>-x.it.rarity*1000-x.it.ilvl,ilvl:x=>-x.it.ilvl*10-x.it.rarity,dps:x=>x.it.slot==='weapon'?-(ls(x.it).dps||0):1e9,armour:x=>-(ls(x.it).armour||0),
+    slot:x=>EQ.indexOf(x.it.slot)*1000-x.it.rarity*100-x.it.ilvl,fav:x=>(x.it.fav?0:1e6)-x.i,emp:x=>-(x.it.emp||0)*1000-x.i}[k]||(x=>-x.i);
+  return a.sort((p,q)=>by(p)-by(q)||q.i-p.i).map(x=>x.it)}
 function slotRow(it,sl){
   if(!it)return `<div class="slotrow"><div><div class="sl">${SLOTN[sl]}</div><div class="nm note">Empty</div></div></div>`;
-  return `<div class="slotrow" data-item="${it.uid}"><div><div class="sl">${SLOTN[it.slot]}${idleLocked(it)?' · locked':''}</div><div class="nm r${it.rarity}">${itemName(it)}</div><div class="meta">${it.rarity===2?BASES[it.base].n+' · ':''}ilvl ${it.ilvl} · ${it.mods.length} mods</div></div><span class="note">›</span></div>`;
+  return `<div class="slotrow" data-item="${it.uid}" data-iu="${it.uid}"><div><div class="sl">${SLOTN[it.slot]}${idleLocked(it)?' · locked':''}</div><div class="nm r${it.rarity}">${it.fav?'<span style="color:#ffd36a">★ </span>':''}${itemName(it)}</div><div class="meta">${it.rarity===2?BASES[it.base].n+' · ':''}ilvl ${it.ilvl} · ${it.mods.length} mods</div></div><span class="note">›</span></div>`;
 }
-function gearScore(eq,f){const st=computeStats(eq),B=BIOMES[biomeOf(f)],sp=B.split,raw=mDMG(f)*1.5;let taken=0;
+function gearScore(eq,f){const st=computeStats(eq),sp=bsplit(f),raw=mDMG(f)*1.5;let taken=0;
   for(const k of TYPES){const sh=sp[k]||0;if(!sh)continue;const rv=raw*sh;taken+=k==='phys'?rv*(1-Math.min(.9,st.armour/(st.armour+5*rv))):rv*(1-st.res[k]/100)}
   const ehp=st.life*raw/Math.max(.05*raw,taken)*(1+st.dodge/250)+st.regen*12+st.lifeOnHit*st.aps*8;
   return st.dps*ehp*(1+st.bag/400)*(1+st.lootFind/600)*(1+st.ms/500)}
@@ -1480,41 +1514,43 @@ function equipBest(){if(S.idle){toast("Gear is locked while an expedition is run
 function viewGear(){
   const st=computeStats(S.eq);
   let h=`<div class="card" style="padding:10px 14px 4px;text-align:center;background:radial-gradient(ellipse at center,#2e2416 0%,var(--panel) 70%)">${heroSVG(S.eq,st.wclass,S.lvl,ptitle())}</div><div class="card"><h3>Character sheet</h3>
-    <div class="row"><b>Life</b><span>${st.life}</span></div>
-    <div class="row"><b>DPS (estimate)</b><span>${st.dps}</span></div>
+    <div class="row"><b>Life</b><span>${Math.round(st.life)}</span></div>
+    <div class="row"><b>DPS (estimate)</b><span>${Math.round(st.dps)}</span></div>
     <div class="row"><b>Weapon</b><span>${st.wmin}–${st.wmax} phys · ${st.aps} atk/s · ${st.crit}% crit · ${st.critMulti}% crit dmg</span></div>
     <div class="row"><b>Added damage</b><span>${st.addPhys?`<span>${st.addPhys} phys</span> `:''}${TYPES.slice(1).map(k=>st['add'+TNAME[k]]?`<span style="color:${TCOL[k]}">${st['add'+TNAME[k]]} ${k}</span>`:'').join(' ')||'—'}${st.incPhys?` · +${st.incPhys}% phys`:''}</span></div>
-    <div class="row"><b>Armour</b><span>${st.armour}</span></div>
-    <div class="row"><b>Poison / Cold / Fire res</b><span><span style="color:${TCOL.poison}">${st.res.poison}%</span> / <span style="color:${TCOL.cold}">${st.res.cold}%</span> / <span style="color:${TCOL.fire}">${st.res.fire}%</span></span></div>
-    <div class="row"><b>Sustain</b><span>${st.regen} regen/s · ${st.lifeOnHit} life per hit</span></div>
+    <div class="row"><b>Armour</b><span>${Math.round(st.armour)}</span></div>
+    <div class="row"><b>Poison / Cold / Fire res</b><span><span style="color:${TCOL.poison}">${Math.round(st.res.poison)}%</span> / <span style="color:${TCOL.cold}">${Math.round(st.res.cold)}%</span> / <span style="color:${TCOL.fire}">${Math.round(st.res.fire)}%</span></span></div>
+    <div class="row"><b>Sustain</b><span>${Math.round(st.regen*10)/10} regen/s · ${Math.round(st.lifeOnHit*10)/10} life per hit</span></div>
     <div class="row"><b>Weapon type</b><span>${WCLASS[st.wclass].n}${WCLASS[st.wclass].range?' (ranged)':''} · ${WCLASS[st.wclass].skills.map(k=>SKILLS[k].n).join(', ')}</span></div>
-    <div class="row"><b>Hazard Dodge</b><span>${st.dodge}%${st.dodge?'':' (the runner won\'t sidestep puddles, vents or darts)'}</span></div>
-    <div class="row"><b>Utility</b><span>${st.ms}% move · ${st.lootFind}% materials · bag ${st.bag}</span></div>
+    <div class="row"><b>Hazard Dodge</b><span>${Math.round(st.dodge)}%${st.dodge?'':' (the runner won\'t sidestep puddles, vents or darts)'}</span></div>
+    <div class="row"><b>Utility</b><span>${Math.round(st.ms)}% move · ${Math.round(st.lootFind)}% materials · bag ${st.bag}</span></div>
     <button class="btn" id="bestBtn" style="margin-top:10px" ${S.idle?'disabled':''}>Equip best gear</button></div>`;
   h+=`<div class="card"><h3>Equipped</h3>${EQ.map(sl=>slotRow(S.eq[sl],sl)).join('')}
-    <div class="note" style="margin-top:4px">Charm: ${S.charm?S.charm.n+' (saves '+S.charm.save*100+'%)':'none. Make one in Refine.'}</div></div>`;
+    <div class="note" style="margin-top:4px">Charm: ${S.charm?S.charm.n+' (saves '+S.charm.save*100+'%)':'none. Make one in Town → Refining.'}</div></div>`;
   for(const u of [...picked])if(!S.inv.some(i=>i.uid===u))picked.delete(u);
-  h+=`<div class="card" id="invCard"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">Inventory · ${S.inv.length}/${S.invCap}</h3>${S.inv.length?`<button class="btn small ghost" id="selBtn">${selMode?'Done':'Select'}</button>`:''}</div>`;
+  h+=`<div class="card" id="invCard"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">Inventory · ${S.inv.length}/${S.invCap}</h3>${S.inv.length?`<button class="btn small ghost" id="selBtn">${selMode?'Done':'Select'}</button>`:''}</div>${S.inv.length>1?`<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><input id="invQ" type="search" placeholder="Search: cold resistance, ring, rare…" value="${invQ.replace(/"/g,'&quot;')}" autocomplete="off" style="flex:1"><span id="invCount" class="note" style="white-space:nowrap"></span></div><select id="invSort" style="margin-bottom:10px">${Object.entries(SORTS).map(([k,v])=>`<option value="${k}" ${(S.invSort||'recent')===k?'selected':''}>Sort: ${v}</option>`).join('')}</select>`:''}`;
   if(selMode&&S.inv.length){const tot={};for(const it of S.inv)if(picked.has(it.uid)){const m=salvageMats(it);for(const k in m)tot[k]=(tot[k]||0)+m[k]}
     h+=`<div class="chips" style="margin-bottom:8px"><button class="btn small ghost" data-pk="0">Normal</button><button class="btn small ghost" data-pk="1">Magic</button><button class="btn small ghost" data-pk="2">Rare</button><button class="btn small ghost" data-pk="all">All</button><button class="btn small ghost" data-pk="none">Clear</button></div>
     <button class="btn danger" id="salvAll" ${picked.size?'':'disabled'}>Hold to salvage ${picked.size} item${picked.size===1?'':'s'}</button>
     ${picked.size?`<div class="note" style="margin:6px 0 4px">You'll get:</div>${matList(tot)}`:'<div class="note" style="margin:6px 0">Tap items to select them, or use the quick-select buttons.</div>'}<div style="height:10px"></div>`}
-  h+=`${S.inv.length?S.inv.map(it=>selMode?pickRow(it):slotRow(it)).join(''):'<div class="note">Empty. Items drop in the dungeon.</div>'}</div>`;
+  h+=`${S.inv.length?sortedInv().map(it=>selMode?pickRow(it):slotRow(it)).join(''):'<div class="note">Empty. Items drop in the dungeon.</div>'}</div>`;
   $('#view').innerHTML=h;
   {const bb=$('#bestBtn');if(bb)bb.onclick=equipBest}
   document.querySelectorAll('[data-item]').forEach(e=>e.onclick=()=>itemModal(findItem(+e.dataset.item)));
   const keep=()=>{const y=$('#town').scrollTop;viewGear();$('#town').scrollTop=y};
   const sb=$('#selBtn');if(sb)sb.onclick=()=>{selMode=!selMode;picked.clear();keep()};
+  const so=$('#invSort');if(so)so.onchange=e=>{S.invSort=e.target.value;persist();keep()};
+  const iq=$('#invQ');if(iq)iq.oninput=e=>{invQ=e.target.value;applyInvFilter()};applyInvFilter();
   document.querySelectorAll('[data-pick]').forEach(e=>e.onclick=()=>{const u=+e.dataset.pick;picked.has(u)?picked.delete(u):picked.add(u);keep()});
-  document.querySelectorAll('[data-pk]').forEach(b=>b.onclick=()=>{const k=b.dataset.pk;if(k==='none')picked.clear();else if(k==='all')S.inv.forEach(i=>picked.add(i.uid));else S.inv.filter(i=>i.rarity===+k).forEach(i=>picked.add(i.uid));keep()});
-  const sa=$('#salvAll');if(sa)holdBtn(sa,1000,()=>{const its=S.inv.filter(i=>picked.has(i.uid)),rares=its.filter(i=>i.rarity===2);
+  document.querySelectorAll('[data-pk]').forEach(b=>b.onclick=()=>{const k=b.dataset.pk;if(k==='none')picked.clear();else if(k==='all')S.inv.filter(i=>!i.fav&&invMatch(i)).forEach(i=>picked.add(i.uid));else S.inv.filter(i=>i.rarity===+k&&!i.fav&&invMatch(i)).forEach(i=>picked.add(i.uid));keep()});
+  const sa=$('#salvAll');if(sa)holdBtn(sa,1000,()=>{for(const i of S.inv)if(i.fav)picked.delete(i.uid);const its=S.inv.filter(i=>picked.has(i.uid)),rares=its.filter(i=>i.rarity===2);
     const go=()=>{const tot={};for(const it of its){const m=salvageMats(it);for(const k in m){tot[k]=(tot[k]||0)+m[k];S.mats[k]=(S.mats[k]||0)+m[k]}}
       S.inv=S.inv.filter(i=>!picked.has(i.uid));picked.clear();selMode=false;persist();keep();toast(`Salvaged ${its.length} item${its.length===1?'':'s'}: `+Object.entries(tot).map(([k,v])=>`${v} ${MATS[k].n}`).join(', '))};
     if(rares.length)modal('Salvage Rares too?',`Your selection includes <b>${rares.length}</b> Rare item${rares.length===1?'':'s'}:<div class="chips" style="margin-top:8px">${rares.map(i=>`<span class="chip r2">${itemName(i)}</span>`).join('')}</div>`,[{label:`Hold to salvage all ${its.length}`,cls:'danger',hold:1,fn:go},{label:'Cancel',cls:'ghost'}]);
     else go()});
 }
 let selMode=false;const picked=new Set();
-function pickRow(it){const on=picked.has(it.uid);return `<div class="slotrow ${on?'picked':''}" data-pick="${it.uid}"><div style="display:flex;gap:10px;align-items:center"><span class="cb">${on?'✓':''}</span><div><div class="sl">${SLOTN[it.slot]}</div><div class="nm r${it.rarity}">${itemName(it)}</div><div class="meta">${it.rarity===2?BASES[it.base].n+' · ':''}ilvl ${it.ilvl} · ${it.mods.length} mods</div></div></div></div>`}
+function pickRow(it){if(it.fav)return `<div class="slotrow" style="opacity:.45" data-iu="${it.uid}"><div style="display:flex;gap:10px;align-items:center"><span class="cb" style="color:#ffd36a">★</span><div><div class="sl">${SLOTN[it.slot]} · favorite, can't salvage</div><div class="nm r${it.rarity}">${itemName(it)}</div></div></div></div>`;const on=picked.has(it.uid);return `<div class="slotrow ${on?'picked':''}" data-pick="${it.uid}" data-iu="${it.uid}"><div style="display:flex;gap:10px;align-items:center"><span class="cb">${on?'✓':''}</span><div><div class="sl">${SLOTN[it.slot]}</div><div class="nm r${it.rarity}">${itemName(it)}</div><div class="meta">${it.rarity===2?BASES[it.base].n+' · ':''}ilvl ${it.ilvl} · ${it.mods.length} mods</div></div></div></div>`}
 function exportSave(){
   const code='DS2:'+b64e(JSON.stringify(S));
   modal('Your backup code',`<div class="note" style="margin-bottom:8px">Copy this code and keep it somewhere safe, like your Notes app or an email to yourself. Paste it into <b>Restore</b> on any device to get your progress back.</div>
@@ -1546,25 +1582,31 @@ function itemModal(it){
     }else btns.push({label:`Equip (${SLOTN[it.slot]})`,disabled:!!S.idle,fn:equipTo(it.slot)});
   }
   else btns.push({label:'Unequip',cls:'ghost',disabled:lock||S.inv.length>=S.invCap,fn:()=>{S.eq[eqKeyOf(it)]=null;S.inv.push(it);persist();render()}});
-  btns.push({label:'Craft on this',cls:'blue',disabled:lock,fn:()=>{S.sel=it.uid;setTab('craft')}});
-  if(!eq){const m=salvageMats(it);btns.push({label:'Hold to salvage for '+Object.entries(m).map(([k,v])=>v+' '+MATS[k].n).join(', '),cls:'ghost',hold:1,fn:()=>{S.inv=S.inv.filter(i=>i.uid!==it.uid);for(const k in m)S.mats[k]=(S.mats[k]||0)+m[k];persist();render();toast('Salvaged')}})}
+  btns.push({label:'Craft on this',cls:'blue',disabled:lock,fn:()=>{S.sel=it.uid;S.townTab='craft';setTab('refine')}});
+  btns.push({label:`⬆ Empower (+${it.emp||0} → +${(it.emp||0)+1}, ${empChance(it.emp||0)}%)`,cls:'ghost',disabled:lock,fn:()=>goEmpower(it.uid)});
+  btns.push({label:it.fav?'★ Remove favorite':'☆ Favorite (protect from salvage)',cls:'ghost',fn:()=>{it.fav=!it.fav;persist();render();toast(it.fav?'Favorited: it can\'t be salvaged':'Removed from favorites')}});
+  if(!eq&&!it.fav){const m=salvageMats(it);btns.push({label:'Hold to salvage for '+Object.entries(m).map(([k,v])=>v+' '+MATS[k].n).join(', '),cls:'ghost',hold:1,fn:()=>{S.inv=S.inv.filter(i=>i.uid!==it.uid);for(const k in m)S.mats[k]=(S.mats[k]||0)+m[k];persist();render();toast('Salvaged')}})}
   let cmp='';
   if(!eq){const cur=(it.slot==='ring'?['ring','ring2']:[it.slot]).map(k=>S.eq[k]).filter(Boolean);if(cur.length)cmp=`<div class="note" style="margin:10px 0 6px">Currently equipped:</div>`+cur.map(c=>itemHTML(c)).join('<div style="height:6px"></div>')}
   btns.push({label:'Close',cls:'ghost'});
-  modal(eq?'Equipped item':'Item',itemHTML(it)+cmp+(S.idle&&!eq?'<div class="note warn" style="margin-top:8px">Gear swaps are locked during an idle run.</div>':''),btns);
+  modal((it.fav?'★ ':'')+(eq?'Equipped item':'Item'),itemHTML(it)+cmp+(it.fav&&!eq?'<div class="note" style="margin-top:8px;color:#ffd36a">Favorited, so it can\'t be salvaged. Remove the favorite first if you want to scrap it.</div>':'')+(S.idle&&!eq?'<div class="note warn" style="margin-top:8px">Gear swaps are locked during an idle run.</div>':''),btns);
 }
 
 let lastNew=null;
 function viewCraft(){
+  const part=S.townTab==='emp'?'emp':'craft';if(part==='emp'&&!(S.flags||{}).empSeen){S.flags.empSeen=1;persist();updTabDots()}
   const items=allItems();let it=findItem(S.sel);if(!it){it=items[0];S.sel=it?it.uid:null}
-  let h=`<div class="card"><h3>Item</h3><select id="itemSel">${items.map(i=>`<option value="${i.uid}" ${i===it?'selected':''}>${isEquipped(i)?'[E] ':''}${itemName(i)} · ilvl ${i.ilvl}</option>`).join('')}</select>
+  let h=hubBar()+`<div class="card"><h3>Item</h3><button class="ipick r${it?it.rarity:0}" id="itemSel">${it?`<span>${isEquipped(it)?'<small>[E] </small>':''}${it.fav?'★ ':''}${itemName(it)} <small>· ilvl ${it.ilvl}</small></span>`:'No items'}<span style="color:var(--dim)">▾</span></button>
     <div style="margin-top:10px">${it?itemHTML(it,lastNew):''}</div>${it&&idleLocked(it)?'<div class="note warn" style="margin-top:8px">Locked: the runner is wearing this on an idle run.</div>':''}</div>`;
-  if(it){
+  if(it&&part==='craft'){
     h+=`<div class="card"><h3>Currency</h3><div class="curgrid">${CKEYS.map(k=>{const c=CUR[k],n=S.cur[k]||0,ok=n>0&&!idleLocked(it)&&(c.omen?true:canUse(k,it));
       const on=c.omen&&S.omen[k];return `<button class="cur ${on?'on':''}" data-cur="${k}" ${ok||on?'':'disabled'}><b>${c.n}<span>${n}</span></b><small>${on?'ACTIVE: tap to cancel':c.d}</small></button>`}).join('')}</div>
-      <div class="note" style="margin-top:8px">Make more currency in the Refine tab from dungeon materials.</div></div>`;
-    {const n=it.emp||0,c=empCost(n),ch=empChance(n),lock=idleLocked(it);h+=`<div class="card"><h3>Empower · +${n} → +${n+1}</h3><div class="note" style="margin-bottom:8px">Every level adds 5% to all of this item's stats, and it never caps. Each attempt costs more and is less likely to work. A failed attempt uses up the materials but never harms the item.</div>
+      <div class="note" style="margin-top:8px">Make more currency in Town → Refining from dungeon materials.</div></div>`;}
+  if(it&&part==='emp'){
+    {const n=it.emp||0,c=empCost(n),ch=empChance(n),lock=idleLocked(it);h+=`<div class="card" id="empCard" style="border-color:#6a4a2a"><h3 style="color:#ffb070">⬆ Empower · +${n} → +${n+1}</h3><div class="note" style="margin-bottom:8px">Every level adds 5% to all of this item's stats, and it never caps. Each attempt costs more and is less likely to work. A failed attempt uses up the materials but never harms the item.</div>
       <div class="row"><b>Success chance</b><span style="color:${ch>=70?'#5dd68c':ch>=45?'#ffd36a':'#ff9a7a'}">${ch}%</span></div>${costHTML(c)}<button class="btn" id="empBtn" style="margin-top:10px" ${afford(c)&&!lock?'':'disabled'}>Empower</button></div>`}
+  }
+  if(it&&part==='craft'){
     h+=`<div class="card"><details><summary>Possible modifiers for this item (ilvl ${it.ilvl})</summary><div class="pool">${[1,0].map(p=>{
       const ids=Object.keys(AFF).filter(id=>AFF[id].p===p&&AFF[id].slots.includes(it.slot));
       return `<div class="ph">${p?'Prefixes':'Suffixes'}</div>`+ids.map(id=>{const a=AFF[id],ok=a.t.filter(t=>t[0]<=it.ilvl);const lo=a.t[0],hi=ok[ok.length-1];
@@ -1572,9 +1614,13 @@ function viewCraft(){
   }
   $('#view').innerHTML=h;lastNew=null;
   {const eb=$('#empBtn');if(eb)eb.onclick=()=>{const n=it.emp||0,c=empCost(n);if(!afford(c)||idleLocked(it))return;pay(c);if(Math.random()*100<empChance(n)){it.emp=n+1;persist();viewCraft();toast(`Success! ${itemName(it)}`)}else{persist();viewCraft();toast(`The empowering failed. Materials lost (it was a ${empChance(n)}% chance).`)}}}
-  $('#itemSel').onchange=e=>{S.sel=+e.target.value;persist();viewCraft()};
+  $('#itemSel').onclick=()=>itemPicker(items);
   document.querySelectorAll('[data-cur]').forEach(b=>b.onclick=()=>useCur(b.dataset.cur,it));
 }
+function itemPicker(items){const eqd=items.filter(isEquipped),inv=sortedInv().filter(i=>!isEquipped(i));
+  const row=i=>`<div class="slotrow" data-pi="${i.uid}" style="${i.uid===S.sel?'border-color:var(--accent)':''}"><div><div class="sl">${SLOTN[i.slot]}${isEquipped(i)?' · equipped':''}</div><div class="nm r${i.rarity}">${i.fav?'<span style="color:#ffd36a">★ </span>':''}${itemName(i)}</div><div class="meta">${i.rarity>=2?BASES[i.base].n+' · ':''}ilvl ${i.ilvl} · ${i.mods.length} mods</div></div></div>`;
+  modal('Choose an item',(eqd.length?'<div class="note" style="margin-bottom:6px">EQUIPPED</div>'+eqd.map(row).join(''):'')+(inv.length?`<div class="note" style="margin:10px 0 6px">INVENTORY · sorted by ${SORTS[S.invSort||'recent'].toLowerCase()}</div>`+inv.map(row).join(''):''),[{label:'Close',cls:'ghost'}]);
+  document.querySelectorAll('[data-pi]').forEach(e=>e.onclick=()=>{S.sel=+e.dataset.pi;$('#modal').classList.add('hidden');paused=false;persist();viewCraft()})}
 function canUse(k,it){
   const c=CUR[k];if(it.rarity===3)return k==='divine';
   if(c.ess)return it.rarity<2;
@@ -1650,7 +1696,7 @@ function updBoard(){const el=document.getElementById('lbList');if(!el)return;
   if(!lbCache.length){el.innerHTML='<div class="note">No scores yet this week. Be the first!</div>';return}
   el.innerHTML=lbCache.map((r,i)=>`<div class="row"><span style="text-align:left;color:${r.id===UID?'var(--accent)':'var(--ink)'}">${i+1}. ${String(r.name||'Runner').replace(/[<>&]/g,'')}</span><span>Floor ${r.floor} · ${r.kills} kills</span></div>`).join('')}
 function mapsCard(){
-  if(!S.maps.length)return `<div class="card"><h3>Delve Maps</h3><div class="note">Bosses always drop a Delve Map, and Champions and chests on deeper floors sometimes do. A map is a single floor with modifiers you take on for extra loot, and it always ends in a boss.</div></div>`;
+  if(!S.maps.length)return `<div class="card"><h3>Delve Maps</h3><div class="note">Delve Maps are rare: bosses sometimes drop one, and Champions and chests on deeper floors very rarely do. A map is a single floor with modifiers you take on for extra loot, and it always ends in a boss.</div></div>`;
   const rc={silk:4,crystal:2};
   let h=`<div class="card"><h3>Delve Maps · ${S.maps.length}/30</h3><div class="note" style="margin-bottom:8px">One floor, with modifiers, more loot and a guaranteed boss. The map is used up when you start it.</div>`;
   for(const m of S.maps){h+=`<div class="recipe"><div class="rhead"><span class="rname" style="color:#c08aff">Depth ${m.floor} · ${bname(m.floor)}</span><span class="rhave">+${m.q}% loot</span></div>
@@ -1679,22 +1725,23 @@ function wireRunExtras(){
   updBoard();if(lbState==='idle')loadBoard();
 }
 function viewTown(){
-  let h=`<h1>TOWN</h1><div class="sub">Turn spare materials into permanent upgrades, crafting currency and storage.</div><div class="card"><h3>Materials</h3>${matList(S.mats)}</div>`;
-  h+=`<div class="card"><h3>Buildings</h3>`;
+  const t=S.townTab==='build'?'build':'refine';
+  let h=hubBar()+`<div class="card"><h3>Materials</h3>${matList(S.mats)}</div>`;
+  if(t==='build'){h+=`<div class="card"><h3>Buildings</h3>`;
   for(const k in BUILD){const B=BUILD[k],l=S.town[k]||0,c=clean(B.cost(l+1)),max=l>=B.max;
     h+=`<div class="recipe"><div class="rhead"><span class="rname">${B.n}</span><span class="rhave">Level ${l}/${B.max}</span></div><div class="reff">${l?'Now: '+B.d(l)+'. ':''}${max?'Fully upgraded.':'Next: '+B.d(l+1)+'.'}</div>${max?'':costHTML(c)}
       <div class="rfoot"><button class="btn small" data-build="${k}" ${!max&&afford(c)?'':'disabled'}>${max?'Maxed':l?'Upgrade':'Build'}</button></div></div>`}
-  h+='</div>';
+  h+='</div>'}
   $('#view').innerHTML=h+'<div id="refineHost"></div>';
   document.querySelectorAll('[data-build]').forEach(b=>b.onclick=()=>{const k=b.dataset.build,l=S.town[k]||0,c=clean(BUILD[k].cost(l+1));if(!afford(c)||l>=BUILD[k].max)return;pay(c);S.town[k]=l+1;persist();const y=$('#town').scrollTop;viewTown();$('#town').scrollTop=y;toast(`${BUILD[k].n} is now level ${l+1}!`)});
-  viewRefine(true);
+  viewRefine(true,t);
 }
 const empCost=n=>clean({crystal:4+2*n,ember:n>=2?3+n:0,starmetal:n>=3?1+Math.floor(n/3):0,voidshard:n>=5?2+n:0});
 const empChance=n=>Math.max(25,100-8*n);
 function shelfCost(){const n=S.shelves||0,c={copper:8+n*6,gel:6+n*4};if(n>=1)c.glowcap=n*3;if(n>=3)c.crystal=(n-2)*3;if(n>=5)c.ember=(n-4)*2;return c}
-function viewRefine(emb){
+function viewRefine(emb,part){
   if(!emb){viewTown();return}
-  let h=`<div class="card"><h3>Refinery${S.town.refinery?` <span style="color:#5dd68c">−${S.town.refinery*8}% costs</span>`:''}</h3><div class="note">Turn materials into crafting currency.</div></div>`;
+  let h='';if(part==='refine'){h+=`<div class="card"><h3>Refinery${S.town.refinery?` <span style="color:#5dd68c">−${S.town.refinery*8}% costs</span>`:''}</h3><div class="note">Turn materials into crafting currency.</div></div>`;
   const group=(title,keys,src,kind)=>{h+=`<div class="card"><h3>${title}</h3>`;for(const k of keys){const r=src[k],have=kind==='charm'?'':`have ${S.cur[k]||0}`;
     const charmBlock=kind==='charm'&&S.charm;const rcst=refCost(r.cost);
     h+=`<div class="recipe"><div class="rhead"><span class="rname">${r.n}</span><span class="rhave">${have}</span></div><div class="reff">${kind==='charm'?`If the runner dies, keep ${r.save*100}% of the bag. Breaks when used.`:r.d}</div>${costHTML(rcst)}
@@ -1702,8 +1749,8 @@ function viewRefine(emb){
   group('Orbs',['tinker','graft','crown','ascend','chaos','void','scour','divine'],CUR,'cur');
   group('Essences (guaranteed modifier)',['essVigor','essRot','essFrost','essCinder'],CUR,'cur');
   group('Omens',['sealP','sealS'],CUR,'cur');
-  group('Charms',Object.keys(CHARMS),CHARMS,'charm');
-  {const sc=shelfCost();h+=`<div class="card"><h3>Storage</h3><div class="recipe"><div class="rhead"><span class="rname">Stash Shelf</span><span class="rhave">Inventory ${S.invCap}/120</span></div>
+  group('Charms',Object.keys(CHARMS),CHARMS,'charm');}
+  if(part==='build')  {const sc=shelfCost();h+=`<div class="card"><h3>Storage</h3><div class="recipe"><div class="rhead"><span class="rname">Stash Shelf</span><span class="rhave">Inventory ${S.invCap}/120</span></div>
     <div class="reff">Adds 10 inventory slots for gear. Each shelf costs more than the last.</div>${S.invCap<120?costHTML(sc):''}
     <div class="rfoot"><button class="btn small" id="shelfBtn" ${S.invCap<120&&afford(sc)?'':'disabled'}>${S.invCap<120?'Build shelf':'Maxed out'}</button></div></div></div>`}
   $('#refineHost').innerHTML=h;
@@ -1771,7 +1818,7 @@ function collectIdle(){
   S.runs+=P.runs;S.best=Math.max(S.best,P.deep);S.cleared=Math.max(S.cleared||0,P.cleared);for(const m of P.maps||[])if(S.maps.length<30)S.maps.push(m);for(const k in P.cur||{})S.cur[k]=(S.cur[k]||0)+P.cur[k];const ups=gainXP((P.xp||0)*(1+.1*(S.town.training||0)));S.bossKills=(S.bossKills||0)+(P.bosses||0);
   const rep={exp:true,dur:I.dur,recalled:!!I.recalled,runs:P.runs,deaths:P.deaths,escapes:P.escapes,floor:P.deep,kills:P.kills,mats:P.mats,items:P.items,salv:P.salv,fullSalv:sal,lost:P.lost,
     taken:P.taken,avgKill:P.kills?P.killT/P.kills:0,lostFull:P.lostFull,swapped:P.swapped,outcome:P.deaths?'died':'escaped',charmName:I.charmUsed?I.charm.n:null,history:I.runs.slice(-40),logTail:I.lastLog||[],mapsN:(P.maps||[]).length,xp:P.xp||0,bosses:P.bosses||0,levelUps:ups,newLvl:S.lvl};
-  S.report=rep;persist();snapNow();backupPrompt();
+  S.report=rep;persist();snapNow();backupPrompt();empIntro();updTabDots();
   modal(I.recalled?'Runner recalled':'Expedition complete',expHTML(rep,computeStats(S.eq)),[{label:'Back to the workshop',fn:render}]);render();
 }
 function xpLine(rep){if(rep.xp==null)return '';const nm=(rep.maps||[]).length+((rep.mapsN)||0);return `${nm?`<div style="color:#c08aff;font-size:13px">+${nm} Delve Map${nm>1?'s':''}</div>`:''}<div style="margin:4px 0 8px;font-size:14px"><b style="color:#ffd36a">+${rep.xp} XP</b>${rep.bosses?` · <b style="color:#ff9a7a">${rep.bosses} boss${rep.bosses>1?'es':''} slain</b>`:''}${rep.levelUps?` · <b style="color:#5dd68c">Level up! Now level ${rep.newLvl}</b>. Spend your points in the Tree tab.`:''}</div>`}
@@ -1805,11 +1852,22 @@ function beginWatchRun(){
 }
 function endWatch(){mode='town';sim=null;$('#game').classList.add('hidden');$('#town').classList.remove('hidden');$('#liveBtns').classList.remove('hidden');$('#watchBtns').classList.add('hidden');setTab('run')}
 function endLive(){
-  const res=sim.summary(),ch=sim.charm,wk=sim.weekly;sim=null;
+  const res=sim.summary(),ch=sim.charm,wk=sim.weekly,mp=sim.isMap?{floor:sim.set.startFloor,n:(sim.set.mapMods||[]).length}:null;sim=null;
   if(wk){const w=S.weekly&&S.weekly.week===weekId()?S.weekly:null,score=res.floor*1000+res.kills;if(!w||score>w.floor*1000+w.kills){S.weekly={week:weekId(),floor:res.floor,kills:res.kills};submitWeekly(res.floor,res.kills);toast('New weekly best!')}}
   const rep=applyResult(res,ch);
-  modal(rep.outcome==='died'?'Your runner died':'Run complete',reportHTML(rep,computeStats(S.eq)),[{label:'Back to the workshop',fn:()=>{mode='town';$('#game').classList.add('hidden');$('#town').classList.remove('hidden');setTab('run')}}]);
+  modal(rep.outcome==='died'?'Your runner died':'Run complete',reportHTML(rep,computeStats(S.eq)),[{label:'Back to the workshop',fn:()=>{mode='town';$('#game').classList.add('hidden');$('#town').classList.remove('hidden');setTab('run');if(mp&&rep.outcome!=='died'&&(res.cleared||0)>=mp.floor)mapReward(mp)}}]);
 }
+function mapReward(mp){const F=mp.floor,n=mp.n,R=Math.random,sc=1+n*.25,opts=[];
+  const curPick=()=>{const pool=['chaos','chaos','void','ascend','divine','scour','crown','graft'],o={};const k=2+Math.floor(F/10);for(let i=0;i<k;i++){const c=pool[Math.floor(R()*pool.length)];o[c]=(o[c]||0)+Math.max(1,Math.round((1+F/12)*sc))}return o};
+  const all=[
+    {id:'unique',w:F>=8?2:0,mk:()=>{const it=mkUnique(UQK[Math.floor(R()*UQK.length)],R,F+2);return{t:'Unique item',d:`<span style="color:#ff9a3a">${itemName(it)}</span> (${BASES[it.base].n})`,give:()=>{S.inv.push(it)}}}},
+    {id:'rare',w:3,mk:()=>{let it=genItem(R,F+3,1.5);let g=0;while(it.rarity<2&&g++<20)it=genItem(R,F+3,1.5);return{t:'Rare gear',d:`<span style="color:${RCOL[it.rarity]}">${itemName(it)}</span> · ${BASES[it.base].n}, item level ${it.ilvl}`,give:()=>{S.inv.push(it)}}}},
+    {id:'cur',w:3,mk:()=>{const o=curPick();return{t:'Currency cache',d:Object.entries(o).map(([k,v])=>`${v} ${CUR[k].n}`).join(', '),give:()=>{for(const k in o)S.cur[k]=(S.cur[k]||0)+o[k]}}}},
+    {id:'emp',w:2,mk:()=>{const o={crystal:Math.round((8+F)*sc),ember:Math.round((4+F/2)*sc),starmetal:Math.round((2+F/5)*sc)};if(F>=16)o.voidshard=Math.round((2+F/6)*sc);return{t:'Empowering materials',d:Object.entries(o).map(([k,v])=>`${v} ${MATS[k].n}`).join(', '),give:()=>{for(const k in o)S.mats[k]=(S.mats[k]||0)+o[k]}}}},
+    {id:'map',w:2,mk:()=>{const m=mkMap(R,F+2,Math.min(4,n+1));return{t:'Deeper Delve Map',d:`Depth ${m.floor} map with ${m.mods.length} modifiers (+${m.q}% loot)`,give:()=>{if(S.maps.length<30)S.maps.push(m)}}}}];
+  const pool=all.filter(o=>o.w>0);while(opts.length<3&&pool.length){const tot=pool.reduce((a,o)=>a+o.w,0);let x=R()*tot,i=0;while(x>pool[i].w){x-=pool[i].w;i++}opts.push(pool.splice(i,1)[0].mk())}
+  modal('Map complete: choose a reward',`<div class="note" style="margin-bottom:8px">You cleared a depth ${F} map with ${n} modifier${n===1?'':'s'}. More modifiers mean bigger rewards. Pick one.</div>`+opts.map((o,i)=>`<div class="recipe" style="margin-bottom:6px"><div class="rhead"><span class="rname">${i+1}. ${o.t}</span></div><div class="note" style="margin-top:4px">${o.d}</div></div>`).join(''),
+    opts.map((o,i)=>({label:`Take ${i+1}: ${o.t}`,fn:()=>{o.give();persist();render();toast('Reward claimed: '+o.t)}})))}
 function bagModal(){
   if(!sim||sim.done)return;const s=sim,mk=MKEYS.filter(k=>s.bag[k]>0);
   let h=`<div class="note" style="margin-bottom:8px">${s.units}/${s.st.bag} slots used. Materials stack ${STACK} to a slot, and each item takes its own slot. Anything you drop is gone for good.</div>`;
@@ -2098,7 +2156,8 @@ function frame(t){
 if(S.idle&&!S.idle.v){try{applyResult(S.idle.res,S.idle.charm)}catch(e){}S.idle=null;persist()}
 if(!S.welcomed){S.welcomed=1;persist();setTimeout(()=>modal('Welcome to Delvesmith',`<p style="margin:0 0 10px">Your <b>runner</b> dives into a dungeon on its own. It fights, mines and loots, and brings home materials and gear, if it survives.</p><p style="margin:0 0 10px">Your job is the <b>workshop</b>: refine materials into crafting currency, craft better gear, and decide how far the runner should push.</p><p style="margin:0">A short tutorial at the bottom of the screen will walk you through it. The <b>Guide</b> tab has everything else.</p>`,[{label:"Let's go"}]),300)}
 initLocalSafety();
-window.__ds={salv:salvageMats,Sim,computeStats,genItem,weekMods,mkUnique,mkMap,get S(){return S},get sim(){return sim},rollMod,simIdleRun,get pend(){return idlePending}};setTab(S.tab||'run');resize();initCloud();requestAnimationFrame(frame);
+updTabDots();
+window.__ds={empIntro,abyssMods,salv:salvageMats,Sim,computeStats,genItem,weekMods,mkUnique,mkMap,get S(){return S},get sim(){return sim},rollMod,simIdleRun,get pend(){return idlePending}};setTab(S.tab||'run');resize();initCloud();requestAnimationFrame(frame);
 })();
 </script>
 </body>
