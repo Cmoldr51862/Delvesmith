@@ -1717,10 +1717,11 @@ function gearScore(eq,f,mode){const w=BEST_W[mode||'balanced'],p=gearParts(eq,f)
 function equipBest(mode){if(S.idle){toast("Gear is locked while an expedition is running");return}
   mode=mode||S.bestMode||'balanced';S.bestMode=mode;
   const f=Math.max(1,(S.best||1)),cls=S.eq.weapon?BASES[S.eq.weapon.base].cls:null,eq={...S.eq},pool=[...S.inv];
+  const attEl=cls==='staff'?(['fire','cold','poison'].find(e=>(S.tree['staff_att_'+e]||0)>0)||null):null,wEl=cls==='staff'?(attEl||BASES[S.eq.weapon.base].el||null):undefined,elOk=it=>wEl===undefined||(BASES[it.base].el||null)===wEl,ELN={fire:'fire',cold:'frost',poison:'poison'};
   const fits=(it,k)=>it.slot===k||(k==='ring2'&&it.slot==='ring');
   for(let pass=0;pass<4;pass++){let any=false;
     for(const k of EQ){let best=gearScore(eq,f,mode),pick=null;
-      for(const it of pool){if(!fits(it,k))continue;if(k==='weapon'&&cls&&BASES[it.base].cls!==cls)continue;
+      for(const it of pool){if(!fits(it,k))continue;if(k==='weapon'&&(cls&&BASES[it.base].cls!==cls||!elOk(it)))continue;
         const sc=gearScore({...eq,[k]:it},f,mode);if(sc>best*1.0005){best=sc;pick=it}}
       if(pick){const old=eq[k];pool.splice(pool.indexOf(pick),1);if(old)pool.push(old);eq[k]=pick;any=true}}
     if(!any)break}
@@ -1730,11 +1731,11 @@ function equipBest(mode){if(S.idle){toast("Gear is locked while an expedition is
   let alt=null;if(cls){let bd=after.dps;for(const it of S.inv){if(it.slot!=='weapon'||BASES[it.base].cls===cls)continue;const d=computeStats({...eq,weapon:it}).dps;if(d>bd*1.05){bd=d;alt={it,d}}}}
   const chips=`<div class="chips" style="margin:0 0 10px;gap:6px">${Object.entries(BEST_W).map(([k,v])=>`<button class="btn small ${k===mode?'':'ghost'}" data-bm="${k}" style="width:auto;flex:1">${v[2]}</button>`).join('')}</div>`;
   const why={balanced:'Mostly damage, with survival still counted.',damage:'Damage first. Survival barely counts.',survival:'Survival first: life, armour, resistances, dodge.'}[mode];
-  let body=chips+`<div class="note" style="margin-bottom:8px">${why} Scored at depth ${f}. Weapons stay ${cls&&WCLASS[cls]?WCLASS[cls].n:'the same type'} so your skills and tree don't change.</div>`;
+  let body=chips+`<div class="note" style="margin-bottom:8px">${why} Scored at depth ${f}. Weapons stay ${cls&&WCLASS[cls]?WCLASS[cls].n:'the same type'} so your skills and tree don't change.${wEl!==undefined?` Only ${wEl?ELN[wEl]:'non-elemental'} staffs are considered${attEl?` because of your ${TREE.find(t=>t.id==='staff_att_'+attEl).n} attunement`:', the same element you have now'}.`:''}</div>`;
   body+=ks.length?ks.map(k=>`<div class="row"><b>${SLOTN[k]}</b><span class="r${eq[k].rarity}">${itemName(eq[k])}</span></div>`).join(''):`<div class="note" style="margin-bottom:6px">Nothing to change: your current gear is already the best for this choice.</div>`;
   body+=`<div class="row" style="margin-top:6px"><b>DPS</b><span>${before.dps} → <b>${after.dps}</b></span></div><div class="row"><b>Life</b><span>${before.life} → <b>${after.life}</b></span></div><div class="row"><b>Armour</b><span>${before.armour} → <b>${after.armour}</b></span></div>`;
   // explain when a higher-DPS weapon of the same type was passed over
-  {const cur=eq.weapon;let top=null,td=cur?computeStats(eq).dps:0;for(const it of S.inv.concat(S.eq.weapon&&S.eq.weapon!==cur?[S.eq.weapon]:[])){if(it===cur||it.slot!=='weapon'||(cls&&BASES[it.base].cls!==cls))continue;const t={...eq,weapon:it},d=computeStats(t).dps;if(d>td+1){td=d;top={it,st:computeStats(t)}}}
+  {const cur=eq.weapon;let top=null,td=cur?computeStats(eq).dps:0;for(const it of S.inv.concat(S.eq.weapon&&S.eq.weapon!==cur?[S.eq.weapon]:[])){if(it===cur||it.slot!=='weapon'||(cls&&BASES[it.base].cls!==cls)||!elOk(it))continue;const t={...eq,weapon:it},d=computeStats(t).dps;if(d>td+1){td=d;top={it,st:computeStats(t)}}}
     if(top&&cur){const a=after,bb=top.st,loss=[];if(a.lifeOnHit-bb.lifeOnHit>.4)loss.push(`${Math.round((a.lifeOnHit-bb.lifeOnHit)*10)/10} life per hit`);if(a.life-bb.life>=5)loss.push(`${a.life-bb.life} life`);
       for(const k of ['fire','cold','poison'])if(a.res[k]-bb.res[k]>=5)loss.push(`${Math.round(a.res[k]-bb.res[k])}% ${k} res`);if(a.dodge-bb.dodge>=3)loss.push(`${Math.round(a.dodge-bb.dodge)}% dodge`);if(a.armour-bb.armour>=20)loss.push(`${a.armour-bb.armour} armour`);
       body+=`<div class="note" style="margin-top:8px">Kept <span class="r${cur.rarity}">${itemName(cur)}</span> over <span class="r${top.it.rarity}">${itemName(top.it)}</span> (+${Math.round(top.st.dps-a.dps)} DPS)${loss.length?' because switching would lose '+loss.join(', '):''}. Pick <b>Damage</b> above to go for DPS.</div>`}}
@@ -2717,7 +2718,7 @@ function fightAnim(a,b,aEnd,bEnd,won,line,done,pvp){modal(pvp?'Arena fight':'Rai
   setTimeout(()=>{const L=$('#fL');if(L)L.innerHTML=`<b style="color:${won?'#5dd68c':'#ff9a7a'}">${line}</b>`;if(btn){btn.disabled=false;btn.textContent='OK';btn.onclick=()=>{$('#modal').classList.add('hidden');paused=false;done&&done()}}},2600)}
 
 updTabDots();
-window.__ds={essAff,essFits,CUR,AFF,BASES,SPECS,idleRot,idleSet,localStats,empIntro,abyssMods,salv:salvageMats,Sim,computeStats,genItem,weekMods,mkUnique,mkMap,get S(){return S},get sim(){return sim},rollMod,simIdleRun,get pend(){return idlePending}};setTab(S.tab||'run');resize();initCloud();requestAnimationFrame(frame);
+window.__ds={equipBest,essAff,essFits,CUR,AFF,BASES,SPECS,idleRot,idleSet,localStats,empIntro,abyssMods,salv:salvageMats,Sim,computeStats,genItem,weekMods,mkUnique,mkMap,get S(){return S},get sim(){return sim},rollMod,simIdleRun,get pend(){return idlePending}};setTab(S.tab||'run');resize();initCloud();requestAnimationFrame(frame);
 })();
 </script>
 </body>
