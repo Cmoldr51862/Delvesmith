@@ -278,9 +278,9 @@ const WMOD={
   daggers:[['thousand','Thousand Cuts','flurry','Flurry stabs 9 times instead of 6.'],['vanish','Vanish','shadow','Shadow Step makes melee attacks miss you for 1.5 seconds.'],['choke','Choking Smoke','smoke','Smoke Bomb slows nearby enemies and they take 20% more damage.']],
   bow:[['volley','Volley','multi','Multishot fires 7 arrows instead of 5.'],['storm','Arrow Storm','rain','Rain of Arrows lands 9 volleys instead of 6.'],['parting','Parting Shot','disengage','Disengage fires 3 arrows at your attacker as you leap.']]
 };
-const SPEC_D={power:'+50% damage, but 25% longer cooldown',swift:'35% shorter cooldown',wide:'35% larger area',dot:'Hits leave a damage-over-time effect: 3 ticks of 25% over 3 seconds',chill:'Hits slow enemies for 2 seconds',stun:'Hits stun enemies for 0.6 seconds',leech:'Heal 2% of your Life for every enemy hit',execute:'Double damage to enemies below 35% Life',extend:'Lasts 50% longer',mend:'Also heals 12% of your Life',haste:'Also makes you move 30% faster for 3 seconds',bigheal:'Heals 45% of your Life instead of 30%'};
+const SPEC_D={power:'+50% damage, but 25% longer cooldown',swift:'35% shorter cooldown',wide:'35% larger area',dot:'Hits leave a damage-over-time effect: 3 ticks of 25% over 3 seconds',chill:'Hits slow enemies for 2 seconds',stun:'Hits stun enemies for 0.6 seconds',leech:'Heal 2% of your Life for every enemy hit',execute:'Always lands critical hits',extend:'Lasts 50% longer',mend:'Also heals 12% of your Life',haste:'Also makes you move 30% faster for 3 seconds',bigheal:'Heals 45% of your Life instead of 30%'};
 const SPECS={cleave:[['power','Heavy Arc'],['wide','Sweeping Arc'],['dot','Rending Arc']],lunge:[['execute','Piercing Lunge'],['swift','Swift Lunge'],['stun','Stunning Lunge']],guard:[['extend','Long Guard'],['swift','Quick Guard'],['mend','Second Wind']],
-  whirl:[['wide','Wide Spin'],['leech','Bloodspin'],['swift','Quick Spin']],rend:[['power','Gash'],['execute','Executioner'],['chill','Crippling Rend']],cry:[['extend','Long Cry'],['swift','Quick Cry'],['haste','Battle Trance']],
+  whirl:[['wide','Wide Spin'],['leech','Bloodspin'],['swift','Quick Spin']],rend:[['power','Gash'],['execute','Brutal Rend'],['chill','Crippling Rend']],cry:[['extend','Long Cry'],['swift','Quick Cry'],['haste','Battle Trance']],
   slam:[['power','Crushing Slam'],['wide','Wide Slam'],['swift','Quick Slam']],quake:[['power','Deep Quake'],['stun','Tremor'],['swift','Quick Quake']],iron:[['extend','Long Skin'],['swift','Quick Skin'],['mend','Bulwark']],
   fireball:[['power','Inferno'],['dot','Ignite'],['swift','Rapid Fire']],nova:[['wide','Wide Nova'],['stun','Glacial Nova'],['swift','Quick Nova']],heal:[['bigheal','Greater Mend'],['swift','Quick Mend'],['haste','Swift Mend']],
   flurry:[['dot','Poisoned Blades'],['execute','Assassinate'],['leech','Blood Blades']],shadow:[['power','Ambush'],['swift','Quick Step'],['stun','Stunning Step']],smoke:[['extend','Thick Smoke'],['swift','Quick Smoke'],['haste','Smoke Dash']],
@@ -313,7 +313,7 @@ const UNIQ={
   echo:{n:'Echo Band',base:'ironring',src:[4],mods:[['life',20,30],['fireRes',10,15],['coldRes',10,15],['poisonRes',10,15]],fx:'echo',d:'Skills have a 25% chance not to go on cooldown.'}
 };
 const UQK=Object.keys(UNIQ);
-function mkUnique(k,rand,ilvl){const U=UNIQ[k],it=newItem(U.base,Math.max(ilvl,BASES[U.base].f));it.rarity=3;it.uq=k;it.name=U.n;it.mods=U.mods.map(([a,lo,hi])=>({a,t:0,lo,hi,u:1,v:AFF[a].dec?Math.round((lo+rand()*(hi-lo))*10)/10:Math.round(lo+rand()*(hi-lo))}));return it}
+function mkUnique(k,rand,ilvl){const U=UNIQ[k],it=newItem(U.base,Math.max(ilvl,BASES[U.base].f));it.rarity=3;it.uq=k;it.name=U.n;it.usc=1;it.mods=U.mods.map(([a,lo,hi])=>{const q=uqScale(a,it.ilvl),f=AFF[a].dec?10:1;lo=Math.round(lo*q*f)/f;hi=Math.round(hi*q*f)/f;return{a,t:0,lo,hi,u:1,v:Math.round((lo+rand()*(hi-lo))*f)/f}});return it}
 function mkMap(rand,floor,nmin){const pool=[...FMK],n=Math.min(4,(nmin||1)+Math.floor(rand()*3)),mods=[];for(let i=0;i<n;i++)mods.push(pool.splice(Math.floor(rand()*pool.length),1)[0]);
   return{mid:++S.uid,floor:Math.max(2,floor),mods,q:mods.reduce((a,m)=>a+FMODS[m].q,0)}}
 const SPITN=['Ooze Spitter','Spore Spider','Frost Caster','Ember Dragon','Void Caster'];
@@ -505,6 +505,7 @@ const saveSummary=x=>({at:x.savedAt||Date.now(),best:x.best||0,cleared:x.cleared
 const progressScore=x=>(x.prestige||0)*1e6+(x.cleared||0)*1e3+(x.runs||0);
 let idbReady=false,lastSnapAt=0,idbOK=null,persisted=null,staleTab=false,myWriteT=0;
 function migrate(){if(S.set)S.set.target=0;
+  if(!S.uqs1){S.uqs1=1;const seen=new Set(),walk=(o,d)=>{if(!o||typeof o!=='object'||d>6||seen.has(o))return;seen.add(o);if(o.uq&&Array.isArray(o.mods)&&!o.usc){o.usc=1;for(const m of o.mods)if(m.u&&typeof m.v==='number'&&m.v>0&&AFF[m.a]){const q=uqScale(m.a,o.ilvl||1),f=AFF[m.a].dec?10:1;m.v=Math.round(m.v*q*f)/f;if(m.lo!=null){m.lo=Math.round(m.lo*q*f)/f;m.hi=Math.round(m.hi*q*f)/f}}return}for(const k in o)walk(o[k],d+1)};walk(S,0)}
   if(!S.uq115){S.uq115=1;const seen=new Set(),walk=(o,d)=>{if(!o||typeof o!=='object'||d>6||seen.has(o))return;seen.add(o);if(o.uq&&Array.isArray(o.mods)){for(const m of o.mods)if(m.u&&typeof m.v==='number'&&m.v>0){const f=AFF[m.a]&&AFF[m.a].dec?10:1;m.v=Math.round(m.v*1.15*f)/f;if(m.lo!=null){m.lo=Math.round(m.lo*1.15*f)/f;m.hi=Math.round(m.hi*1.15*f)/f}}return}for(const k in o)walk(o[k],d+1)};walk(S,0)}if(S.tab==='craft'){S.tab='refine';S.townTab='craft'}
 if(S.v4&&!S.v5){S.v5=1;S.inv.push(newItem('mallet',1),newItem('gnarledstaff',1),newItem('twinshivs',1),newItem('shortbow',1))}
 if(S.v3&&!S.v4){S.v4=1;S.inv.push(newItem('slippers',2))}
@@ -660,7 +661,7 @@ function genItem(rand,floor,boost,wk){
 }
 function tierLabel(m){if(m.u)return 'U';const n=AFF[m.a].t.length;return (isP(m)?'P':'S')+(n-m.t)}
 function itemHTML(it,newMods){
-  const b=BASES[it.base];let h=`<div class="item"><div class="iname r${it.rarity}">${itemName(it)}</div>${it.emp?`<div class="ibase" style="color:#ffb070">Empowered +${it.emp}: all stats +${it.emp*5}%</div>`:''}${it.ess&&CUR[it.ess]?`<div class="ibase" style="color:#8fd3ff">${CUR[it.ess].n} used</div>`:''}`;
+  const b=ibase(it);let h=`<div class="item"><div class="iname r${it.rarity}">${itemName(it)}</div>${it.emp?`<div class="ibase" style="color:#ffb070">Empowered +${it.emp}: all stats +${it.emp*5}%</div>`:''}${it.ess&&CUR[it.ess]?`<div class="ibase" style="color:#8fd3ff">${CUR[it.ess].n} used</div>`:''}`;
   if(it.rarity===2)h+=`<div class="ibase">${b.n}</div>`;
   h+=`<div class="ibase">${b.cls?WCLASS[b.cls].n+(WCLASS[b.cls].range?' (ranged)':''):SLOTN[it.slot]} · Item Level ${it.ilvl}</div><div class="ihr"></div>`;
   {const L=localStats(it),aug=(v,a)=>a?`<span class="r1"><b>${v}</b></span>`:v;
@@ -680,8 +681,15 @@ function itemHTML(it,newMods){
 
 // ================= STATS =================
 const LOCALW=['addPhys','incPhys','incAps','incCrit'];
+const uqBaseC={};
+function ibase(it){const b=BASES[it.base];if(!it.uq||it.ilvl<=b.f)return b;const ck=it.base+'@'+it.ilvl;if(uqBaseC[ck])return uqBaseC[ck];
+  let ref=null,rp=0;const pw=x=>x.min!=null?(x.min+x.max)*x.aps:(x.armour||0);
+  for(const k in BASES){const x=BASES[k];if(x.slot!==b.slot||x.cls!==b.cls||x.f>it.ilvl)continue;const v=pw(x);if(v>rp){rp=v;ref=x}}
+  const nb={...b},own=pw(b);if(ref&&own>0&&rp>own){const k=rp/own;if(b.min!=null){nb.min=Math.round(b.min*k);nb.max=Math.round(b.max*k)}else nb.armour=Math.round(b.armour*k)}
+  return uqBaseC[ck]=nb}
+const uqScale=(a,il)=>{const top=l=>{const t=AFF[a].t.filter(t=>t[0]<=l);return t[t.length-1][2]};return il>20?top(il)/top(20):1};
 function localStats(it){
-  const b=BASES[it.base],o={},em=1+.05*(it.emp||0),sum=k=>it.mods.filter(m=>m.a===k).reduce((a,m)=>a+m.v,0)*em;
+  const b=ibase(it),o={},em=1+.05*(it.emp||0),sum=k=>it.mods.filter(m=>m.a===k).reduce((a,m)=>a+m.v,0)*em;
   if(b.min){const ap=sum('addPhys'),ip=sum('incPhys'),ia=sum('incAps'),ic=sum('incCrit'),f=1+ip/100;
     o.min=Math.round((b.min*em+ap*.75)*f);o.max=Math.round((b.max*em+ap*1.25)*f);o.physAug=ap>0||ip>0||em>1;
     o.aps=Math.round(b.aps*(1+ia/100)*100)/100;o.apsAug=ia>0;o.crit=Math.round(b.crit*(1+ic/100)*10)/10;o.critAug=ic>0;
@@ -694,7 +702,7 @@ function localStats(it){
 function computeStats(eq){
   const s={incDmg:0,skillDmg:0,treeArmour:0,allRes:0,cdr:0,berserk:0,bloodlust:0,secondWind:0,execute:0,unbreak:0,treasure:0,dodge:0,life:80,armour:0,incArmour:0,addPhys:0,incPhys:0,addFire:0,addCold:0,addPoison:0,incAps:0,incCrit:0,critMulti:150,fireRes:0,coldRes:0,poisonRes:0,regen:0,lifeOnHit:0,lootFind:0,ms:0,bagCap:0};
   let w=null;
-  for(const sl of EQ){const it=eq[sl];if(!it)continue;const b=BASES[it.base],L=localStats(it);
+  for(const sl of EQ){const it=eq[sl];if(!it)continue;const b=ibase(it),L=localStats(it);
     if(L.armour)s.armour+=L.armour;
     const em=1+.05*(it.emp||0);if(b.imp)for(const k in b.imp)if(k!=='armour')s[k]+=b.imp[k]*em;
     for(const m of it.mods){if(m.a==='armour'||m.a==='incArmour')continue;if(sl==='weapon'&&LOCALW.includes(m.a))continue;s[m.a]+=m.v*em}
@@ -1033,10 +1041,10 @@ class Sim{
     this.fx(this.P.x+this.P.w/2,this.P.y-4,'-'+Math.round(tot),TCOL[parts[0][0]]);
     if(this.life<=0){this.life=0;this.deathCause=`${src} hit for ${Math.round(tot)} (`+parts.map(p=>`${Math.round(p[1])} ${TNAME[p[0]].toLowerCase()}`).join(', ')+')';this.logm('Killed by '+this.deathCause,'#ff6b6b');this.finish('died')}
   }
-  hitEnemy(e,mult,forceCrit,quiet){const isSk=mult!=null&&!quiet,SP=isSk?this.curSpec:null,m0=mult;if(SP==='power')mult*=1.5;if(SP==='execute'&&e.hp<e.max*.35)mult*=2;mult=(mult||1)*(this.buff.cry>0?1.4:1)*(1+((this.st.wclass==='staff'?this.st.spellDmg:this.st.attackDmg)||0)/100)*(this.st.m&&this.st.m.choke&&this.buff.smoke>0?1.2:1)*(isSk?1+(this.st.skillDmg||0)/100:1)*(this.st.execute&&e.hp<e.max*.35?1.5:1);
+  hitEnemy(e,mult,forceCrit,quiet){const isSk=mult!=null&&!quiet,SP=isSk?this.curSpec:null,m0=mult;if(SP==='power')mult*=1.5;mult=(mult||1)*(this.buff.cry>0?1.4:1)*(1+((this.st.wclass==='staff'?this.st.spellDmg:this.st.attackDmg)||0)/100)*(this.st.m&&this.st.m.choke&&this.buff.smoke>0?1.2:1)*(isSk?1+(this.st.skillDmg||0)/100:1)*(this.st.execute&&e.hp<e.max*.35?1.5:1);
     const st=this.st,B=BIOMES[this.L.b],r=()=>.75+this.rng()*.5;
     const d={phys:(st.wmin+this.rng()*(st.wmax-st.wmin)+st.addPhys*r())*(1+st.incPhys/100),fire:st.addFire*r()*(1+(st.eleDmg||0)/100),cold:st.addCold*r()*(1+(st.eleDmg||0)/100),poison:st.addPoison*r()*(1+(st.eleDmg||0)/100)};
-    const crit=forceCrit||this.rng()<st.crit/100,cm=crit?st.critMulti/100:1;let tot=0;
+    const crit=forceCrit||SP==='execute'||this.rng()<st.crit/100,cm=crit?st.critMulti/100:1;let tot=0;
     for(const k of TYPES)tot+=d[k]*cm*(1-(B.eres[k]||0));
     tot=Math.max(1,tot*mult);e.hp-=tot;e.hurt=.12;if(e.engT==null)e.engT=this.t;const kbs=quiet?0:isSk?110:({hammer:130,axe:70,sword:35}[this.st.wclass]||0);if(!e.boss&&kbs&&e.wind<=0){const ka=Math.atan2(e.y+e.h/2-this.P.y-9,e.x+e.w/2-this.P.x-9);e.kb=.1;e.kbx=Math.cos(ka)*kbs;e.kby=Math.sin(ka)*kbs}e.aggro=true;
     this.dealt+=tot;this.hits.push({t:this.t,d:tot});
