@@ -1074,7 +1074,7 @@ class Sim{
       if(de<dx||(L.boss&&L.boss.hp>0)){s.state='retreat';s.logm('Pulling out: heading back to the entrance','#ff9a7a')}else{s.exitMode=true;s.logm('Pulling out: heading for the exit','#ff9a7a')}}
     // ---- explore: reveal what the runner can see, track visited rooms
     {const ptx0=Math.floor(pcx/TS),pty0=Math.floor(pcy/TS),k0=pty0*L.W+ptx0;if(s.lastSeenK!==k0){s.lastSeenK=k0;const V=7;for(let dy=-V;dy<=V;dy++)for(let dx=-V;dx<=V;dx++)if(dx*dx+dy*dy<=V*V){const x=ptx0+dx,y=pty0+dy;if(x>=0&&y>=0&&x<L.W&&y<L.H)L.seen[y*L.W+x]=1}
-      s.vis=s.vis||{};for(const r of L.rooms)if(!s.vis[r.id]&&inRoom(r,pcx,pcy)){s.vis[r.id]=1;s.rv=(s.rv||0)+1}}}
+      L.vis=L.vis||{};for(const r of L.rooms)if(!L.vis[r.id]&&inRoom(r,pcx,pcy)){L.vis[r.id]=1;L.rv=(L.rv||0)+1}}}
     // ---- choose what to do
     let tgt=null,best=1e9;
     for(const e of L.enemies){const ex=e.x+e.w/2,ey=e.y+e.h/2,d=Math.hypot(ex-pcx,ey-pcy);if(d>5*TS)continue;
@@ -1352,8 +1352,8 @@ function viewTree(){
   const order=[0,3,1,2,4];
   h+=`<div style="display:flex;gap:4px;margin-bottom:10px;overflow-x:auto">${order.map(i=>{const sp=TREE.filter(n=>n.b===i).reduce((a,n)=>a+(S.tree[n.id]||0),0);return `<button data-ttab="${i}" style="flex:1;min-width:0;padding:9px 2px;border-radius:10px;border:1px solid ${tab===i?TBR[i].c:'var(--line)'};background:${tab===i?'#241d2e':'transparent'};color:${tab===i?TBR[i].c:'var(--dim)'};font-weight:800;font-size:11px;letter-spacing:.5px">${TBR[i].n}<small style="display:block;font-weight:600;color:var(--dim)">${sp} pts</small></button>`}).join('')}</div>`;
   h+=`<div class="note" style="margin:0 2px 8px">${TBR[tab].d}</div>`;
-  const nodeSvg=(n,x,y)=>{if(n.kind==='spec'){const rk=S.tree[n.id]||0,av=nodeAvail(n),can=av&&pts>0&&!rk&&!S.idle,col='#ffd36a',taken=n.grp&&TREE.some(t=>t.grp===n.grp&&t.id!==n.id&&(S.tree[t.id]||0)>0);
-      return `<g data-node="${n.id}" style="cursor:pointer"><rect x="${x-44}" y="${y-12}" width="104" height="24" fill="transparent"/>${can?`<circle cx="${x-34}" cy="${y}" r="11" fill="none" stroke="${col}" stroke-width="1.2" opacity=".5"><animate attributeName="r" values="9;13;9" dur="1.6s" repeatCount="indefinite"/></circle>`:''}<circle cx="${x-34}" cy="${y}" r="8" fill="${rk?col:'#16131d'}" stroke="${rk||can?col:'#3a3148'}" stroke-width="2"/><text x="${x-22}" y="${y+3.5}" fill="${rk?'#ffd36a':taken?'#4a4258':av?'#cfc6dc':'#6f6680'}" font-size="9.5" font-weight="${rk?800:500}"${taken?' text-decoration="line-through"':''}>${n.n}</text></g>`}
+  const nodeSvg=(n,x,y)=>{if(n.kind==='spec'){const rk=S.tree[n.id]||0,av=nodeAvail(n),can=av&&pts>0&&!rk&&!S.idle,col='#ffd36a',taken=n.grp&&TREE.some(t=>t.grp===n.grp&&t.id!==n.id&&(S.tree[t.id]||0)>0),tc=rk?'#ffd36a':taken?'#4a4258':av?'#cfc6dc':'#6f6680';
+      return `<g data-node="${n.id}" style="cursor:pointer"><rect x="${x-19}" y="${y-11}" width="38" height="44" fill="transparent"/>${can?`<circle cx="${x}" cy="${y}" r="10" fill="none" stroke="${col}" stroke-width="1.2" opacity=".5"><animate attributeName="r" values="9;13;9" dur="1.6s" repeatCount="indefinite"/></circle>`:''}<circle cx="${x}" cy="${y}" r="8" fill="${rk?col:'#16131d'}" stroke="${rk||can?col:'#3a3148'}" stroke-width="2"/>${taken?`<line x1="${x-5}" y1="${y-5}" x2="${x+5}" y2="${y+5}" stroke="#4a4258" stroke-width="2"/>`:''}`+n.n.split(' ').map((w,i)=>`<text x="${x}" y="${y+19+i*9.5}" fill="${tc}" font-size="8.5" font-weight="${rk?800:500}" text-anchor="middle">${w}</text>`).join('')+`</g>`}
     const rk=S.tree[n.id]||0,av=nodeAvail(n),can=av&&pts>0&&rk<n.max&&!S.idle,col=TBR[n.b].c,R=n.kind==='key'?26:n.kind==='notable'?23:n.kind==='mod'?20:19;
     const fill=rk>=n.max?col:rk>0?'#3a2a1a':'#16131d',stroke=rk>0||can?col:'#3a3148';let g=`<g data-node="${n.id}" style="cursor:pointer">`;
     if(can)g+=`<circle cx="${x}" cy="${y}" r="${R+5}" fill="none" stroke="${col}" stroke-width="1.5" opacity=".5"><animate attributeName="r" values="${R+3};${R+8};${R+3}" dur="1.6s" repeatCount="indefinite"/><animate attributeName="opacity" values=".6;0;.6" dur="1.6s" repeatCount="indefinite"/></circle>`;
@@ -1373,10 +1373,12 @@ function viewTree(){
     for(const c of Object.keys(WCLASS)){
       const ns=TREE.filter(n=>n.cls===c),m=ns[0],a=ns[1],mods=ns.slice(2),eq=c===wcl;
       const mods0=mods.filter(n=>n.kind==='mod'),specs=mods.filter(n=>n.kind==='spec');
-      let svg=`<svg viewBox="0 0 360 ${specs.length?296:178}" style="width:100%;display:block;touch-action:pan-y">`;
-      const P={[m.id]:{x:110,y:34},[a.id]:{x:250,y:34}};mods0.forEach((n,i)=>P[n.id]={x:60+i*120,y:118});specs.forEach(n=>{const pi=mods0.findIndex(x=>x.id===n.grp),j=specs.filter(x=>x.grp===n.grp).indexOf(n);P[n.id]={x:60+pi*120,y:196+j*32}});
+      let svg=`<svg viewBox="${specs.length?'-8 0 376 272':'0 0 360 178'}" style="width:100%;display:block;touch-action:pan-y">`;
+      const P={[m.id]:{x:110,y:34},[a.id]:{x:250,y:34}};mods0.forEach((n,i)=>P[n.id]={x:60+i*120,y:118});specs.forEach(n=>{const pi=mods0.findIndex(x=>x.id===n.grp),j=specs.filter(x=>x.grp===n.grp).indexOf(n);P[n.id]={x:60+pi*120+(j-1)*39,y:j===1?218:200}});
       for(const n of [a,...mods0]){const on=(S.tree[m.id]||0)>0&&(S.tree[n.id]||0)>0;svg+=`<line x1="110" y1="34" x2="${P[n.id].x}" y2="${P[n.id].y}" stroke="${on?TBR[4].c:'#3a3148'}" stroke-width="${on?3:2}"/>`}
-      for(const n of mods0){const pp=P[n.id],ss=specs.filter(x=>x.grp===n.id);if(!ss.length)continue;const y2=P[ss[ss.length-1].id].y;svg+=`<path d="M${pp.x} ${pp.y+30} L${pp.x} ${pp.y+44} L${pp.x-34} ${pp.y+44} L${pp.x-34} ${y2}" fill="none" stroke="${(S.tree[n.id]||0)>0?'#6a5a3a':'#3a3148'}" stroke-width="1.5"/>`}
+      for(const n of mods0){const pp=P[n.id],ss=specs.filter(x=>x.grp===n.id);if(!ss.length)continue;const mon=(S.tree[n.id]||0)>0,by=pp.y+54,lc=c=>c?'#ffd36a':mon?'#6a5a3a':'#3a3148';const anyOn=ss.some(x=>(S.tree[x.id]||0)>0);
+        svg+=`<line x1="${pp.x}" y1="${pp.y+38}" x2="${pp.x}" y2="${by}" stroke="${lc(anyOn)}" stroke-width="${anyOn?2.5:1.5}"/><line x1="${P[ss[0].id].x}" y1="${by}" x2="${P[ss[2].id].x}" y2="${by}" stroke="${lc(false)}" stroke-width="1.5"/>`;
+        for(const x of ss){const on=(S.tree[x.id]||0)>0;svg+=`<line x1="${P[x.id].x}" y1="${by}" x2="${P[x.id].x}" y2="${P[x.id].y-8}" stroke="${lc(on)}" stroke-width="${on?2.5:1.5}"/>`;if(on&&P[x.id].x!==pp.x)svg+=`<line x1="${pp.x}" y1="${by}" x2="${P[x.id].x}" y2="${by}" stroke="#ffd36a" stroke-width="2.5"/>`}}
       for(const n of ns)svg+=nodeSvg(n,P[n.id].x,P[n.id].y);
       h+=`<div class="card" style="padding:10px 8px 4px;${eq?'border-color:#ffd36a':''}"><div style="display:flex;justify-content:space-between;padding:0 6px"><b>${WCLASS[c].n}</b><span class="note" style="color:${eq?'#ffd36a':'var(--dim)'}">${eq?'Equipped: active':'Inactive until equipped'}</span></div>${svg}</svg></div>`;
     }
@@ -2341,7 +2343,7 @@ function draw(){
   if(s.set.retreat){ctx.fillStyle='#fff';ctx.fillRect(16+150*s.set.retreat/100,14,2,16)}
   ctx.fillStyle='#fff';ctx.font='bold 11px system-ui,sans-serif';ctx.fillText(`${Math.ceil(s.life)}/${mx}`,172,26);
   const dps=s.hits.reduce((a,h)=>a+h.d,0)/4;
-  ctx.font='12px system-ui,sans-serif';ctx.fillStyle='#d6cde2';ctx.fillText(`${bname(s.floor)} · ${fmtT(s.t)} · rooms ${Math.min(s.rv||0,L.order.length)}/${L.order.length}`,16,44);
+  ctx.font='12px system-ui,sans-serif';ctx.fillStyle='#d6cde2';ctx.fillText(`${bname(s.floor)} · ${fmtT(s.t)} · rooms ${Math.min(L.rv||0,L.order.length)}/${L.order.length}`,16,44);
   {ctx.textAlign='right';ctx.fillStyle='#9a90a8';ctx.font='bold 9px system-ui,sans-serif';ctx.fillText('DEPTH',W-18,22);ctx.fillStyle='#ffe2b0';ctx.font='900 26px system-ui,sans-serif';ctx.fillText(String(s.floor),W-18,47);const dg=danger(s.floor);ctx.font='bold 10px system-ui,sans-serif';ctx.fillStyle=dg<3?'#7ee36b':dg<15?'#ffd36a':dg<80?'#ff9a4a':'#ff5f5f';ctx.fillText('Danger ×'+dg,W-18,61);ctx.textAlign='left';ctx.font='12px system-ui,sans-serif'}
   ctx.fillStyle=s.units>=s.st.bag?'#ff6b6b':'#efe8dc';ctx.fillText(`Bag ${s.units}/${s.st.bag}`,16,62);
   ctx.fillStyle='#ffd84a';ctx.fillText(`DPS ${Math.round(dps)}`,92,62);ctx.fillStyle='#efe8dc';ctx.fillText(`Kills ${s.kills}`,160,62);
