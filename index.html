@@ -1385,7 +1385,7 @@ function tutTick(){
   if(!st||$('#town').classList.contains('hidden')){bar.classList.add('hidden');return}
   const n=TUT.indexOf(st)+1;bar.classList.remove('hidden');
   bar.innerHTML=`<div style="flex:1;min-width:0"><div class="note" style="color:var(--accent)">Getting started · ${n}/${TUT.length}</div><b style="font-size:14px">${st.t}</b><div class="note" style="margin-top:2px">${st.d}</div></div><div style="display:flex;flex-direction:column;gap:6px"><button class="btn small" id="tutGo">Show me</button><button class="btn small ghost" id="tutHide">Hide</button></div>`;
-  $('#tutGo').onclick=()=>{if(st.tt&&S.townTab!==st.tt){S.townTab=st.tt;if(S.tab===st.tab)render()}if(S.tab!==st.tab)setTab(st.tab);setTimeout(()=>{const el=document.querySelector(st.sel);if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.classList.remove('pulse');void el.offsetWidth;el.classList.add('pulse')}else toast('Not available right now. Finish what the runner is doing first.')},60)};
+  $('#tutGo').onclick=()=>{if(st.tab==='run'&&S.runTab&&S.runTab!=='run'){S.runTab='run';if(S.tab==='run')render()}if(st.tt&&S.townTab!==st.tt){S.townTab=st.tt;if(S.tab===st.tab)render()}if(S.tab!==st.tab)setTab(st.tab);setTimeout(()=>{const el=document.querySelector(st.sel);if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.classList.remove('pulse');void el.offsetWidth;el.classList.add('pulse')}else toast('Not available right now. Finish what the runner is doing first.')},60)};
   $('#tutHide').onclick=()=>{S.tutOff=1;persist();tutTick();toast('Tutorial hidden. You can turn it back on in the Guide tab.')};
   if(S.tutLast!==st.id){if(S.tutLast&&S.tutLast!==st.id)toast('Step complete!');S.tutLast=st.id;persist()}
 }
@@ -1446,6 +1446,9 @@ function viewRun(){
   const st=computeStats(S.eq),s=S.set;{const cp=checkpoints();s.startFloor=cp.filter(f=>f<=(s.startFloor||1)).pop()||1}let h=`<h1>DELVESMITH</h1><div class="sub">Craft the gear. Send the runner. Don't die with a full bag.</div>`;
   {const nb=(S.best||0)+1;h+=`<div class="card" style="display:flex;justify-content:space-between;align-items:center;background:linear-gradient(135deg,#2a1f16,var(--panel))"><div><div class="note" style="letter-spacing:1.5px">DEEPEST DEPTH</div><div style="font-size:40px;font-weight:900;color:#ffe2b0;line-height:1.05">${S.best||0}</div><div class="note">${S.best?bname(S.best):'Not started'}</div></div><div style="text-align:right"><div class="note">NEXT BIOME</div><b>${bname(bstart(bidxOf(nb)+1))}</b><div class="note">at depth ${bstart(bidxOf(nb)+1)}</div><div class="note" style="margin-top:4px">Danger at ${nb}: ×${danger(nb)}</div></div></div>`}
   if(cloudState!=='on'&&S.runs-(S.backupRuns||0)>=5)h+=`<div class="advice" style="margin:0 0 12px;display:flex;align-items:center;gap:10px"><span style="flex:1">${S.backupAt?`${S.runs-(S.backupRuns||0)} runs since your last backup.`:"You haven't saved a backup file yet."}</span><button class="btn small" id="nudgeBtn">Save backup</button></div>`;
+  const rt=S.runTab||'run',nm=(S.maps||[]).length;
+  h+=`<div class="chips" style="margin:0 0 12px;gap:6px">${[['run','Send the runner'],['maps','Delve maps'+(nm?` (${nm})`:'')],['weekly','Weekly']].map(([k,n])=>`<button class="btn small ${rt===k?'':'ghost'}" data-rt="${k}" style="width:auto;flex:1;min-width:0;padding:8px 2px;font-size:12px;white-space:nowrap">${n}</button>`).join('')}</div>`;
+  if(rt==='run'){
   if(S.idle){
     const I=S.idle,el=idleElapsed(),cur=idlePending&&idlePending.i===I.runs.length?idlePending.r:null,seen=cur?cur.log.filter(l=>l.t<=el-I.doneT):[];
     h+=`<div class="card"><h3>Idle expedition · ${fmtHM(I.dur)}</h3>
@@ -1473,7 +1476,10 @@ function viewRun(){
       <div class="note" style="margin-top:8px">Single runs play now, with speed controls and a bag. Expeditions run in real time for ${IDLE_LBL[s.idleLen]}, and you can watch them live at any point.</div>
       <div class="note ${S.charm?'':'warn'}" style="margin-top:6px">${S.charm?`Charm: ${S.charm.n} (saves ${S.charm.save*100}% on death)`:'No charm equipped. Die and you lose everything you carry.'}</div></div>`;
   }
-  h+=mapsCard()+weeklyCard();
+  }
+  if(rt==='maps')h+=mapsCard();
+  if(rt==='weekly')h+=weeklyCard();
+  if(rt==='run'){
   h+=`<div class="card"><h3>Your runner · ${ptitle()?ptitle()+' · ':''}Level ${S.lvl}${treePts()?` · <span style="color:var(--accent)">${treePts()} skill point${treePts()>1?'s':''} to spend</span>`:''}</h3>
     <div class="row"><b>Life</b><span>${st.life}${st.regen?` · ${st.regen}/s regen`:''}${st.lifeOnHit?` · ${st.lifeOnHit} per hit`:''}</span></div>
     <div class="row"><b>Damage</b><span>${st.dps} DPS · ${st.aps} atk/s · ${st.crit}% crit</span></div>
@@ -1498,7 +1504,9 @@ function viewRun(){
     <li><b>Refine</b> materials into crafting orbs and essences, then use them on gear in the <b>Craft</b> tab.</li>
     <li>Each biome hits with a different damage type. Check the run report to see what's hurting you.</li></ul></details></div>
     <button class="btn ghost" id="resetBtn">Reset all progress</button>`;
+  }
   $('#view').innerHTML=h;
+  document.querySelectorAll('[data-rt]').forEach(b=>b.onclick=()=>{S.runTab=b.dataset.rt;persist();viewRun();$('#town').scrollTop=0});
   document.querySelectorAll('[data-st]').forEach(b=>b.onclick=()=>{const k=b.dataset.st,d=+b.dataset.d;
     if(k==='retreat')s.retreat=clamp(s.retreat+d,0,70);
     else if(k==='descendHp')s.descendHp=clamp(s.descendHp+d,0,90);
@@ -1518,8 +1526,9 @@ function viewRun(){
   const wb=$('#watchBtn');if(wb)wb.onclick=startWatch;
   const rb=$('#recallBtn');if(rb)rb.onclick=()=>modal('Recall the runner?','You keep the loot from every finished run. Whatever it is carrying in the current run is lost.',[{label:'Recall now',cls:'danger',fn:()=>{S.idle.finished=true;S.idle.recalled=true;persist();collectIdle()}},{label:'Keep going',cls:'ghost'}]);
   wireRunExtras();
-  $('#expBtn').onclick=exportSave;$('#impBtn').onclick=importSave;$('#fileBtn').onclick=backupFile;bindAcct();$('#loadFileBtn').onclick=loadFile;$('#snapBtn').onclick=showSnaps;const nb=$('#nudgeBtn');if(nb)nb.onclick=backupFile;
-  $('#resetBtn').onclick=()=>modal('Reset all progress?','This wipes your materials, currency, gear and records. A restore point of your current progress is kept on this device.',[{label:'Wipe everything',cls:'danger',fn:()=>{snapNow();setTimeout(()=>{defSave();myWriteT=0;try{localStorage.setItem(KEY+'_t','0')}catch(e){}persist();setTab('run')},50)}},{label:'Cancel',cls:'ghost'}]);
+  if($('#expBtn')){$('#expBtn').onclick=exportSave;$('#impBtn').onclick=importSave;$('#fileBtn').onclick=backupFile;bindAcct();$('#loadFileBtn').onclick=loadFile;$('#snapBtn').onclick=showSnaps;const nb=$('#nudgeBtn');if(nb)nb.onclick=backupFile;
+  }
+  if($('#resetBtn'))$('#resetBtn').onclick=()=>modal('Reset all progress?','This wipes your materials, currency, gear and records. A restore point of your current progress is kept on this device.',[{label:'Wipe everything',cls:'danger',fn:()=>{snapNow();setTimeout(()=>{defSave();myWriteT=0;try{localStorage.setItem(KEY+'_t','0')}catch(e){}persist();setTab('run')},50)}},{label:'Cancel',cls:'ghost'}]);
 }
 setInterval(()=>{if(S.idle&&!S.idle.finished)idleCatchUp();else updIdleCard()},1000);
 function updIdleCard(){
