@@ -278,10 +278,18 @@ const WMOD={
   daggers:[['thousand','Thousand Cuts','flurry','Flurry stabs 9 times instead of 6.'],['vanish','Vanish','shadow','Shadow Step makes melee attacks miss you for 1.5 seconds.'],['choke','Choking Smoke','smoke','Smoke Bomb slows nearby enemies and they take 20% more damage.']],
   bow:[['volley','Volley','multi','Multishot fires 7 arrows instead of 5.'],['storm','Arrow Storm','rain','Rain of Arrows lands 9 volleys instead of 6.'],['parting','Parting Shot','disengage','Disengage fires 3 arrows at your attacker as you leap.']]
 };
+const SPEC_D={power:'+50% damage, but 25% longer cooldown',swift:'35% shorter cooldown',wide:'35% larger area',dot:'Hits leave a damage-over-time effect: 3 ticks of 25% over 3 seconds',chill:'Hits slow enemies for 2 seconds',stun:'Hits stun enemies for 0.6 seconds',leech:'Heal 2% of your Life for every enemy hit',execute:'Double damage to enemies below 35% Life',extend:'Lasts 50% longer',mend:'Also heals 12% of your Life',haste:'Also makes you move 30% faster for 3 seconds',bigheal:'Heals 45% of your Life instead of 30%'};
+const SPECS={cleave:[['power','Heavy Arc'],['wide','Sweeping Arc'],['dot','Rending Arc']],lunge:[['execute','Piercing Lunge'],['swift','Swift Lunge'],['stun','Stunning Lunge']],guard:[['extend','Long Guard'],['swift','Quick Guard'],['mend','Second Wind']],
+  whirl:[['wide','Wide Spin'],['leech','Bloodspin'],['swift','Quick Spin']],rend:[['power','Gash'],['execute','Executioner'],['chill','Crippling Rend']],cry:[['extend','Long Cry'],['swift','Quick Cry'],['haste','Battle Trance']],
+  slam:[['power','Crushing Slam'],['wide','Wide Slam'],['swift','Quick Slam']],quake:[['power','Deep Quake'],['stun','Tremor'],['swift','Quick Quake']],iron:[['extend','Long Skin'],['swift','Quick Skin'],['mend','Bulwark']],
+  fireball:[['power','Inferno'],['dot','Ignite'],['swift','Rapid Fire']],nova:[['wide','Wide Nova'],['stun','Glacial Nova'],['swift','Quick Nova']],heal:[['bigheal','Greater Mend'],['swift','Quick Mend'],['haste','Swift Mend']],
+  flurry:[['dot','Poisoned Blades'],['execute','Assassinate'],['leech','Blood Blades']],shadow:[['power','Ambush'],['swift','Quick Step'],['stun','Stunning Step']],smoke:[['extend','Thick Smoke'],['swift','Quick Smoke'],['haste','Smoke Dash']],
+  multi:[['power','Barbed Arrows'],['chill','Frost Arrows'],['swift','Quick Draw']],rain:[['wide','Wide Rain'],['dot','Fire Rain'],['swift','Quick Rain']],disengage:[['haste','Long Leap'],['swift','Quick Leap'],['mend','Recover']]};
 for(const c of Object.keys(WCLASS)){
   TREE.push({id:c+'_m',b:4,cls:c,n:WCLASS[c].n+' Mastery',max:3,st:{clsDmg:8}});
   TREE.push({id:c+'_a',b:4,cls:c,n:WCLASS[c].n+' Adept',max:3,st:{incAps:4},req:[c+'_m']});
-  for(const [k,n,sk,d] of WMOD[c])TREE.push({id:c+'_'+k,b:4,cls:c,n,max:1,kind:'mod',st:{['mod_'+k]:1},req:[c+'_m'],d,sk});
+  for(const [k,n,sk,d] of WMOD[c]){TREE.push({id:c+'_'+k,b:4,cls:c,n,max:1,kind:'mod',st:{['mod_'+k]:1},req:[c+'_m'],d,sk});
+    for(const [code,nm] of SPECS[sk]||[])TREE.push({id:c+'_'+k+'_'+code,b:4,cls:c,n:nm,max:1,kind:'spec',grp:c+'_'+k,st:{['mod_sp_'+sk+'_'+code]:1},req:[c+'_'+k],d:SPEC_D[code],sk})}
 }
 const TBR=[{n:'MIGHT',c:'#ff8a6a',d:'Attack damage: everything except staves'},{n:'FORTITUDE',c:'#8fb0ff',d:'Life, Armour and resistances'},{n:'CUNNING',c:'#7ee36b',d:'Dodge, speed, loot and cooldowns'},{n:'SORCERY',c:'#b48cff',d:'Spell damage: staff bolts and staff skills, plus elemental damage'},{n:'WEAPONS',c:'#ffd36a',d:'Bonuses for one weapon type. They only work while that weapon is equipped.'}];
 const TSD={attackDmg:v=>`+${v}% attack damage`,spellDmg:v=>`+${v}% spell damage`,eleDmg:v=>`+${v}% elemental damage (fire, cold, poison)`,castSpd:v=>`+${v}% staff attack speed`,rangeInc:v=>`+${v}% staff and bow range`,areaInc:v=>`+${v}% skill area`,clsDmg:v=>`+${v}% damage`,
@@ -290,7 +298,7 @@ const TSD={attackDmg:v=>`+${v}% attack damage`,spellDmg:v=>`+${v}% spell damage`
 const xpNeed=l=>Math.round(15*Math.pow(l,1.5));
 const treeSpent=()=>Object.values(S.tree||{}).reduce((a,b)=>a+b,0);
 const treePts=()=>(S.lvl||1)-1-treeSpent();
-const nodeAvail=n=>!n.req||n.req.some(r=>(S.tree[r]||0)>0);
+const nodeAvail=n=>(!n.req||n.req.some(r=>(S.tree[r]||0)>0))&&!(n.grp&&TREE.some(t=>t.grp===n.grp&&t.id!==n.id&&(S.tree[t.id]||0)>0));
 function gainXP(x){S.xp=(S.xp||0)+Math.round(x);let up=0;while(S.lvl<60&&S.xp>=xpNeed(S.lvl)){S.xp-=xpNeed(S.lvl);S.lvl++;up++}if(S.lvl>=60)S.xp=0;return up}
 const UNIQ={
   gelheart:{n:'Gelheart',base:'vest',src:[0],mods:[['life',30,40],['regen',2,3]],fx:'gelheart',d:'Heal 8% of your Life whenever you kill a monster.'},
@@ -308,7 +316,7 @@ const UQK=Object.keys(UNIQ);
 function mkUnique(k,rand,ilvl){const U=UNIQ[k],it=newItem(U.base,Math.max(ilvl,BASES[U.base].f));it.rarity=3;it.uq=k;it.name=U.n;it.mods=U.mods.map(([a,lo,hi])=>({a,t:0,lo,hi,u:1,v:AFF[a].dec?Math.round((lo+rand()*(hi-lo))*10)/10:Math.round(lo+rand()*(hi-lo))}));return it}
 function mkMap(rand,floor,nmin){const pool=[...FMK],n=Math.min(4,(nmin||1)+Math.floor(rand()*3)),mods=[];for(let i=0;i<n;i++)mods.push(pool.splice(Math.floor(rand()*pool.length),1)[0]);
   return{mid:++S.uid,floor:Math.max(2,floor),mods,q:mods.reduce((a,m)=>a+FMODS[m].q,0)}}
-const SPITN=['Ooze Spitter','Spore Spider','Frost Caster','Magma Spitter','Void Caster'];
+const SPITN=['Ooze Spitter','Spore Spider','Frost Caster','Ember Dragon','Void Caster'];
 const bidxOf=f=>f<5?0:Math.floor(f/5),cycOf=f=>Math.floor((f-1)/25),biomeOf=f=>bidxOf(f)%5;
 const ROMAN=['I','II','III','IV','V','VI','VII','VIII','IX','X'],CYCN=['','Elder ','Ancient ','Primordial ','Eternal '];
 const cycName=f=>{const c=cycOf(f);return c?' '+(ROMAN[c]||('T'+(c+1))):''};
@@ -859,12 +867,24 @@ class Sim{
   near(r,x,y){return this.L.enemies.filter(e=>e.hp>0&&Math.hypot(e.x+e.w/2-x,e.y+e.h/2-y)<r+Math.max(e.w,e.h)/2)}
   cleanup(){this.L.enemies=this.L.enemies.filter(e=>e.hp>0)}
   ring(x,y,r,c,dur){if(this.visual)this.L.rings.push({x,y,r,c,t:0,max:dur||.35})}
-  aoe(x,y,r,mult,extra,c){r*=1+(this.st.areaInc||0)/100;for(const e of this.near(r,x,y)){this.hitEnemy(e,mult);if(extra&&e.hp>0)extra(e);if(this.done)return}this.cleanup();this.ring(x,y,r,c||'#ffffff')}
+  aoe(x,y,r,mult,extra,c){r*=(1+(this.st.areaInc||0)/100)*(this.curSpec==='wide'?1.35:1);for(const e of this.near(r,x,y)){this.hitEnemy(e,mult);if(extra&&e.hp>0)extra(e);if(this.done)return}this.cleanup();this.ring(x,y,r,c||'#ffffff')}
   nearest(maxD,needLos){const c=this.pc();let b=null,bd=1e9;for(const e of this.L.enemies){if(e.hp<=0)continue;const d=Math.hypot(e.x+e.w/2-c.x,e.y+e.h/2-c.y);if(d<maxD&&d<bd&&(!needLos||los(this.L,c.x,c.y,e.x+e.w/2,e.y+e.h/2,4))){bd=d;b=e}}return b}
   shoot(kind,ang,mult,aoe){const c=this.pc(),sp=kind==='arrow'?520:kind==='bolt'?430:360;this.L.pshots.push({kind,x:c.x+Math.cos(ang)*12,y:c.y+Math.sin(ang)*12,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,mult,aoe:aoe||0,life:1.2})}
+  specOf(id){const M=this.st.m||{};for(const [c] of SPECS[id]||[])if(M['sp_'+id+'_'+c])return c;return null}
   cast(id){
     if(this.done)return 'The run is over';
     const sk=SKILLS[id];if((this.cds[id]||0)>0)return `${sk.n} is cooling down`;
+    const sp=this.specOf(id);if(sp){if(this.P.dash)this.P.dash.spw=1;const prevSpec=this.curSpec,ev0=this.ev.length,ps0=this.L.pshots.length,bf={...this.buff};this.curSpec=sp;const r=this.cast0(id);this.curSpec=prevSpec;if(r)return r;
+      for(let i=ev0;i<this.ev.length;i++){const e=this.ev[i],f=e.f;e.f=()=>{const o=this.curSpec;this.curSpec=sp;try{f()}finally{this.curSpec=o}}}
+      for(let i=ps0;i<this.L.pshots.length;i++)this.L.pshots[i].spec=sp;
+      const dsh=this.P.dash;if(dsh&&dsh.end&&!dsh.spw){const f0=dsh.end;dsh.spw=1;dsh.end=()=>{const o=this.curSpec;this.curSpec=sp;try{f0()}finally{this.curSpec=o}}}
+      const c=this.pc();if(sp==='extend')for(const k of ['guard','iron','smoke','cry','whirl','regrow'])if((this.buff[k]||0)>(bf[k]||0))this.buff[k]*=1.5;
+      if(sp==='mend'){this.life=Math.min(this.st.life,this.life+this.st.life*.12);this.pfx(c.x,c.y,'#7ee36b',10,90)}
+      if(sp==='haste')this.buff.haste=Math.max(this.buff.haste||0,3);
+      if(sp==='bigheal')this.life=Math.min(this.st.life,this.life+this.st.life*.15);
+      this.cds[id]=(this.cds[id]||0)*(sp==='power'?1.25:sp==='swift'?.65:1);return ''}
+    return this.cast0(id)}
+  cast0(id){const sk=SKILLS[id];
     const p=this.P,c=this.pc(),wc=this.wc(),M=this.st.m||{},rng=(wc.range||4.5)*TS*(1+(this.st.rangeInc||0)/100);let t;
     const ang=e=>Math.atan2(e.y+e.h/2-c.y,e.x+e.w/2-c.x);
     switch(id){
@@ -994,7 +1014,7 @@ class Sim{
     this.fx(this.P.x+this.P.w/2,this.P.y-4,'-'+Math.round(tot),TCOL[parts[0][0]]);
     if(this.life<=0){this.life=0;this.deathCause=`${src} hit for ${Math.round(tot)} (`+parts.map(p=>`${Math.round(p[1])} ${TNAME[p[0]].toLowerCase()}`).join(', ')+')';this.logm('Killed by '+this.deathCause,'#ff6b6b');this.finish('died')}
   }
-  hitEnemy(e,mult,forceCrit,quiet){const isSk=mult!=null&&!quiet;mult=(mult||1)*(this.buff.cry>0?1.4:1)*(1+((this.st.wclass==='staff'?this.st.spellDmg:this.st.attackDmg)||0)/100)*(this.st.m&&this.st.m.choke&&this.buff.smoke>0?1.2:1)*(isSk?1+(this.st.skillDmg||0)/100:1)*(this.st.execute&&e.hp<e.max*.3?1.5:1);
+  hitEnemy(e,mult,forceCrit,quiet){const isSk=mult!=null&&!quiet,SP=isSk?this.curSpec:null,m0=mult;if(SP==='power')mult*=1.5;if(SP==='execute'&&e.hp<e.max*.35)mult*=2;mult=(mult||1)*(this.buff.cry>0?1.4:1)*(1+((this.st.wclass==='staff'?this.st.spellDmg:this.st.attackDmg)||0)/100)*(this.st.m&&this.st.m.choke&&this.buff.smoke>0?1.2:1)*(isSk?1+(this.st.skillDmg||0)/100:1)*(this.st.execute&&e.hp<e.max*.3?1.5:1);
     const st=this.st,B=BIOMES[this.L.b],r=()=>.75+this.rng()*.5;
     const d={phys:(st.wmin+this.rng()*(st.wmax-st.wmin)+st.addPhys*r())*(1+st.incPhys/100),fire:st.addFire*r()*(1+(st.eleDmg||0)/100),cold:st.addCold*r()*(1+(st.eleDmg||0)/100),poison:st.addPoison*r()*(1+(st.eleDmg||0)/100)};
     const crit=forceCrit||this.rng()<st.crit/100,cm=crit?st.critMulti/100:1;let tot=0;
@@ -1002,6 +1022,8 @@ class Sim{
     tot=Math.max(1,tot*mult);e.hp-=tot;e.hurt=.12;if(e.engT==null)e.engT=this.t;const kbs=quiet?0:isSk?110:({hammer:130,axe:70,sword:35}[this.st.wclass]||0);if(!e.boss&&kbs&&e.wind<=0){const ka=Math.atan2(e.y+e.h/2-this.P.y-9,e.x+e.w/2-this.P.x-9);e.kb=.1;e.kbx=Math.cos(ka)*kbs;e.kby=Math.sin(ka)*kbs}e.aggro=true;
     this.dealt+=tot;this.hits.push({t:this.t,d:tot});
     if(st.lifeOnHit)this.life=Math.min(st.life,this.life+st.lifeOnHit);
+    if(SP&&e.hp>0){if(SP==='chill')e.slow=Math.max(e.slow||0,2);else if(SP==='stun')e.stun=Math.max(e.stun||0,e.boss?.2:.6);else if(SP==='dot'){const ee=e,mm=m0*.25;for(let i=1;i<=3;i++)this.ev.push({at:this.t+i,f:()=>{if(ee.hp>0){const o=this.curSpec;this.curSpec=null;this.hitEnemy(ee,mm,false,true);this.curSpec=o;this.cleanup()}}})}}
+    if(SP==='leech')this.life=Math.min(st.life,this.life+st.life*.02);
     const U=st.u||{};
     if(U.leech)this.life=Math.min(st.life,this.life+tot*.02);
     if(U.prism&&crit&&!(this.prismCd>this.t)){this.prismCd=this.t+.25;let o=null,od=1e9;for(const q of this.L.enemies){if(q===e||q.hp<=0)continue;const dd=Math.hypot(q.x-e.x,q.y-e.y);if(dd<4*TS&&dd<od){od=dd;o=q}}
@@ -1186,8 +1208,8 @@ class Sim{
     L.shots=L.shots.filter(x=>x.life>0);
     for(const q of L.pshots){q.x+=q.vx*dt;q.y+=q.vy*dt;q.life-=dt;let boom=false,hitE=null;
       if(tileAt(L,Math.floor(q.x/TS),Math.floor(q.y/TS))===1){q.life=0;boom=true}
-      else for(const e of L.enemies){if(e.hp>0&&e!==q.skip&&!(q.hit&&q.hit.has(e))&&Math.hypot(e.x+e.w/2-q.x,e.y+e.h/2-q.y)<Math.max(e.w,e.h)/2+5){hitE=e;if(q.kind==='arrow'&&(st.u||{}).pierce){(q.hit=q.hit||new Set()).add(e);s.hitEnemy(e,q.mult==null?undefined:q.mult);s.cleanup();if(s.done)return;hitE=null;continue}q.life=0;boom=true;break}}
-      if(boom){if(q.aoe)s.aoe(q.x,q.y,q.aoe,q.mult,null,'#ff9a4a');else if(hitE){s.hitEnemy(hitE,q.mult==null?undefined:q.mult);s.cleanup()}if(s.done)return}}
+      else for(const e of L.enemies){if(e.hp>0&&e!==q.skip&&!(q.hit&&q.hit.has(e))&&Math.hypot(e.x+e.w/2-q.x,e.y+e.h/2-q.y)<Math.max(e.w,e.h)/2+5){hitE=e;if(q.kind==='arrow'&&(st.u||{}).pierce){(q.hit=q.hit||new Set()).add(e);{const o0=s.curSpec;s.curSpec=q.spec||null;s.hitEnemy(e,q.mult==null?undefined:q.mult);s.curSpec=o0}s.cleanup();if(s.done)return;hitE=null;continue}q.life=0;boom=true;break}}
+      if(boom){const o0=s.curSpec;s.curSpec=q.spec||null;if(q.aoe)s.aoe(q.x,q.y,q.aoe,q.mult,null,'#ff9a4a');else if(hitE){s.hitEnemy(hitE,q.mult==null?undefined:q.mult);s.cleanup()}s.curSpec=o0;if(s.done)return}}
     L.pshots=L.pshots.filter(q=>q.life>0);
     if(s.visual){for(const r of L.rings)r.t+=dt;L.rings=L.rings.filter(r=>r.t<r.max)}
     for(const c of L.chests)if(!c.open&&overlap(p,c)){
@@ -1330,7 +1352,9 @@ function viewTree(){
   const order=[0,3,1,2,4];
   h+=`<div style="display:flex;gap:4px;margin-bottom:10px;overflow-x:auto">${order.map(i=>{const sp=TREE.filter(n=>n.b===i).reduce((a,n)=>a+(S.tree[n.id]||0),0);return `<button data-ttab="${i}" style="flex:1;min-width:0;padding:9px 2px;border-radius:10px;border:1px solid ${tab===i?TBR[i].c:'var(--line)'};background:${tab===i?'#241d2e':'transparent'};color:${tab===i?TBR[i].c:'var(--dim)'};font-weight:800;font-size:11px;letter-spacing:.5px">${TBR[i].n}<small style="display:block;font-weight:600;color:var(--dim)">${sp} pts</small></button>`}).join('')}</div>`;
   h+=`<div class="note" style="margin:0 2px 8px">${TBR[tab].d}</div>`;
-  const nodeSvg=(n,x,y)=>{const rk=S.tree[n.id]||0,av=nodeAvail(n),can=av&&pts>0&&rk<n.max&&!S.idle,col=TBR[n.b].c,R=n.kind==='key'?26:n.kind==='notable'?23:n.kind==='mod'?20:19;
+  const nodeSvg=(n,x,y)=>{if(n.kind==='spec'){const rk=S.tree[n.id]||0,av=nodeAvail(n),can=av&&pts>0&&!rk&&!S.idle,col='#ffd36a',taken=n.grp&&TREE.some(t=>t.grp===n.grp&&t.id!==n.id&&(S.tree[t.id]||0)>0);
+      return `<g data-node="${n.id}" style="cursor:pointer"><rect x="${x-44}" y="${y-12}" width="104" height="24" fill="transparent"/>${can?`<circle cx="${x-34}" cy="${y}" r="11" fill="none" stroke="${col}" stroke-width="1.2" opacity=".5"><animate attributeName="r" values="9;13;9" dur="1.6s" repeatCount="indefinite"/></circle>`:''}<circle cx="${x-34}" cy="${y}" r="8" fill="${rk?col:'#16131d'}" stroke="${rk||can?col:'#3a3148'}" stroke-width="2"/><text x="${x-22}" y="${y+3.5}" fill="${rk?'#ffd36a':taken?'#4a4258':av?'#cfc6dc':'#6f6680'}" font-size="9.5" font-weight="${rk?800:500}"${taken?' text-decoration="line-through"':''}>${n.n}</text></g>`}
+    const rk=S.tree[n.id]||0,av=nodeAvail(n),can=av&&pts>0&&rk<n.max&&!S.idle,col=TBR[n.b].c,R=n.kind==='key'?26:n.kind==='notable'?23:n.kind==='mod'?20:19;
     const fill=rk>=n.max?col:rk>0?'#3a2a1a':'#16131d',stroke=rk>0||can?col:'#3a3148';let g=`<g data-node="${n.id}" style="cursor:pointer">`;
     if(can)g+=`<circle cx="${x}" cy="${y}" r="${R+5}" fill="none" stroke="${col}" stroke-width="1.5" opacity=".5"><animate attributeName="r" values="${R+3};${R+8};${R+3}" dur="1.6s" repeatCount="indefinite"/><animate attributeName="opacity" values=".6;0;.6" dur="1.6s" repeatCount="indefinite"/></circle>`;
     if(n.kind==='key')g+=`<rect x="${x-R*.78}" y="${y-R*.78}" width="${R*1.56}" height="${R*1.56}" transform="rotate(45 ${x} ${y})" fill="${fill}" stroke="${stroke}" stroke-width="3"/>`;
@@ -1348,9 +1372,11 @@ function viewTree(){
   }else{
     for(const c of Object.keys(WCLASS)){
       const ns=TREE.filter(n=>n.cls===c),m=ns[0],a=ns[1],mods=ns.slice(2),eq=c===wcl;
-      let svg=`<svg viewBox="0 0 360 178" style="width:100%;display:block;touch-action:pan-y">`;
-      const P={[m.id]:{x:110,y:34},[a.id]:{x:250,y:34}};mods.forEach((n,i)=>P[n.id]={x:60+i*120,y:118});
-      for(const n of [a,...mods]){const on=(S.tree[m.id]||0)>0&&(S.tree[n.id]||0)>0;svg+=`<line x1="110" y1="34" x2="${P[n.id].x}" y2="${P[n.id].y}" stroke="${on?TBR[4].c:'#3a3148'}" stroke-width="${on?3:2}"/>`}
+      const mods0=mods.filter(n=>n.kind==='mod'),specs=mods.filter(n=>n.kind==='spec');
+      let svg=`<svg viewBox="0 0 360 ${specs.length?296:178}" style="width:100%;display:block;touch-action:pan-y">`;
+      const P={[m.id]:{x:110,y:34},[a.id]:{x:250,y:34}};mods0.forEach((n,i)=>P[n.id]={x:60+i*120,y:118});specs.forEach(n=>{const pi=mods0.findIndex(x=>x.id===n.grp),j=specs.filter(x=>x.grp===n.grp).indexOf(n);P[n.id]={x:60+pi*120,y:196+j*32}});
+      for(const n of [a,...mods0]){const on=(S.tree[m.id]||0)>0&&(S.tree[n.id]||0)>0;svg+=`<line x1="110" y1="34" x2="${P[n.id].x}" y2="${P[n.id].y}" stroke="${on?TBR[4].c:'#3a3148'}" stroke-width="${on?3:2}"/>`}
+      for(const n of mods0){const pp=P[n.id],ss=specs.filter(x=>x.grp===n.id);if(!ss.length)continue;const y2=P[ss[ss.length-1].id].y;svg+=`<path d="M${pp.x} ${pp.y+30} L${pp.x} ${pp.y+44} L${pp.x-34} ${pp.y+44} L${pp.x-34} ${y2}" fill="none" stroke="${(S.tree[n.id]||0)>0?'#6a5a3a':'#3a3148'}" stroke-width="1.5"/>`}
       for(const n of ns)svg+=nodeSvg(n,P[n.id].x,P[n.id].y);
       h+=`<div class="card" style="padding:10px 8px 4px;${eq?'border-color:#ffd36a':''}"><div style="display:flex;justify-content:space-between;padding:0 6px"><b>${WCLASS[c].n}</b><span class="note" style="color:${eq?'#ffd36a':'var(--dim)'}">${eq?'Equipped: active':'Inactive until equipped'}</span></div>${svg}</svg></div>`;
     }
@@ -1367,12 +1393,15 @@ function viewTree(){
 function nodeModal(n){
   const rk=S.tree[n.id]||0,av=nodeAvail(n),pts=treePts(),can=av&&pts>0&&rk<n.max&&!S.idle;
   const per=n.d||Object.entries(n.st).map(([k,v])=>TSD[k](v)).join(', ')+(n.cls&&n.st.clsDmg?` with ${WCLASS[n.cls].n}s`:n.cls?` with ${WCLASS[n.cls].n}s`:'');
-  let tag=n.kind==='key'?' · KEYSTONE':n.kind==='notable'?' · NOTABLE':n.kind==='mod'?` · CHANGES ${SKILLS[n.sk].n.toUpperCase()}`:'';
+  let tag=n.kind==='key'?' · KEYSTONE':n.kind==='notable'?' · NOTABLE':n.kind==='mod'?` · CHANGES ${SKILLS[n.sk].n.toUpperCase()}`:n.kind==='spec'?` · ${SKILLS[n.sk].n.toUpperCase()} SPECIALIZATION`:'';
   let b=`<div class="note" style="color:${TBR[n.b].c};margin-bottom:6px">${n.cls?WCLASS[n.cls].n.toUpperCase():TBR[n.b].n}${tag}</div><div style="font-size:15px;margin-bottom:8px">${per}${n.max>1?' per point':''}</div>`;
   if(n.sk)b+=`<div class="note" style="margin-bottom:6px">Normally: ${SKILLS[n.sk].d}</div>`;
   if(n.cls)b+=`<div class="note" style="margin-bottom:6px">Only works while a ${WCLASS[n.cls].n} is equipped.</div>`;
   if(n.max>1)b+=`<div class="note">Rank ${rk}/${n.max}${rk?` · currently ${Object.entries(n.st).map(([k,v])=>TSD[k](Math.round(v*rk*10)/10)).join(', ')}`:''}</div>`;
-  if(!av)b+=`<div class="note warn" style="margin-top:6px">Needs ${n.req.map(r=>TREE.find(t=>t.id===r).n).join(' or ')} first.</div>`;
+  if(n.grp)b+=`<div class="note" style="margin-bottom:6px">Pick <b>one</b> of the three ${SKILLS[n.sk].n} specializations. Resetting the tree lets you choose again.</div>`;
+  const gt=n.grp&&TREE.find(t=>t.grp===n.grp&&t.id!==n.id&&(S.tree[t.id]||0)>0);
+  if(gt)b+=`<div class="note warn" style="margin-top:6px">You already chose ${gt.n} for ${SKILLS[n.sk].n}.</div>`;
+  else if(!av)b+=`<div class="note warn" style="margin-top:6px">Needs ${n.req.map(r=>TREE.find(t=>t.id===r).n).join(' or ')} first.</div>`;
   else if(!pts&&rk<n.max)b+=`<div class="note" style="margin-top:6px">No points to spend. Level up by killing monsters and bosses.</div>`;
   if(S.idle)b+=`<div class="note warn" style="margin-top:6px">The tree is locked while an expedition is running.</div>`;
   modal(n.n,b,[{label:rk>=n.max?'Maxed':'Spend a point',disabled:!can,fn:()=>{S.tree[n.id]=rk+1;persist();viewTree();toast(`${n.n} ${n.max>1?`rank ${rk+1}`:'unlocked'}!`)}},{label:'Close',cls:'ghost'}]);
@@ -2121,7 +2150,19 @@ function drawMonster(e,b,ex,ey,px,py,T){
       ctx.fillStyle=wind?'#ffffff':'#ff4a4a';for(const [dx,dy] of [[-2,-2],[2,-2],[-1,0],[1,0]]){ctx.beginPath();ctx.arc(ex+Math.cos(a)*6+dx,ey+Math.sin(a)*4+dy-1,1,0,7);ctx.fill()}
       if(wind&&!hurt){ctx.fillStyle='rgba(79,209,197,.55)';for(let i=0;i<4;i++){ctx.beginPath();ctx.arc(ex+Math.cos(a)*(9+i*3),ey+Math.sin(a)*(9+i*3),1.5+i*.4,0,7);ctx.fill()}}}
     else if(b===2){poly([ex,ey-h/2-6,ex+w/2+2,ey+h/2,ex-w/2-2,ey+h/2],C('b'));poly([ex,ey-h/2-6,ex+5,ey-2,ex-5,ey-2],C('a'));ctx.fillStyle=C('e');ctx.fillRect(ex-4,ey-4,2,2);ctx.fillRect(ex+2,ey-4,2,2);const ox=ex+Math.cos(a)*14,oy=ey+Math.sin(a)*10;ctx.fillStyle=wind?'#ffffff':'#8fd3ff';ctx.beginPath();ctx.arc(ox,oy,4*pu,0,7);ctx.fill()}
-    else if(b===3){ctx.fillStyle=C('b');ctx.beginPath();ctx.ellipse(ex,ey,w/2+5,h/2-2,a,0,7);ctx.fill();ctx.strokeStyle=hurt?'#fff':'#ffb070';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(ex-8,ey-2);ctx.lineTo(ex-2,ey+3);ctx.lineTo(ex+5,ey-3);ctx.stroke();ctx.fillStyle=C('a');ctx.beginPath();ctx.arc(ex+Math.cos(a)*9,ey+Math.sin(a)*6,6*pu,0,7);ctx.fill();eyes(ex+Math.cos(a)*9,ey+Math.sin(a)*6-2,a,2,1.3,'#ffd84a')}
+    else if(b===3){// Ember Dragon
+      const f=Math.cos(a)>=0?1:-1,fl=Math.sin(t*9),R1=hurt?'#fff':'#b8321e',R2=hurt?'#fff':'#6a160e',Bel=hurt?'#fff':'#f0a040';
+      ctx.strokeStyle=R2;ctx.lineWidth=3;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(ex-f*6,ey+3);ctx.quadraticCurveTo(ex-f*16,ey+8,ex-f*20,ey-2+fl*2);ctx.stroke();ctx.lineCap='butt';poly([ex-f*20,ey-6+fl*2,ex-f*25,ey-2+fl*2,ex-f*20,ey+1+fl*2],R2);
+      for(const sd of [-1,1]){ctx.fillStyle=sd<0?R2:R1;ctx.beginPath();ctx.moveTo(ex-f*2,ey-3);ctx.lineTo(ex-f*2+sd*4-f*6,ey-16-fl*5);ctx.lineTo(ex-f*2+sd*2-f*14,ey-12-fl*4);ctx.lineTo(ex-f*2-f*12,ey-4);ctx.closePath();ctx.globalAlpha=sd<0?.8:1;ctx.fill();ctx.globalAlpha=1;
+        ctx.strokeStyle='rgba(0,0,0,.35)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(ex-f*2,ey-3);ctx.lineTo(ex-f*2+sd*2-f*14,ey-12-fl*4);ctx.stroke()}
+      ctx.fillStyle=R2;ctx.fillRect(ex-6,ey+4,3,6);ctx.fillRect(ex+3,ey+4,3,6);
+      ctx.fillStyle=R1;ctx.beginPath();ctx.ellipse(ex,ey+1,9,6.5,0,0,7);ctx.fill();ctx.fillStyle=Bel;ctx.beginPath();ctx.ellipse(ex+f*1,ey+3,6,3.5,0,0,7);ctx.fill();
+      ctx.strokeStyle=R1;ctx.lineWidth=4.5;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(ex+f*5,ey-2);ctx.quadraticCurveTo(ex+f*9,ey-8,ex+f*11,ey-10);ctx.stroke();ctx.lineCap='butt';
+      const hx=ex+f*13,hy=ey-11;ctx.fillStyle=R1;ctx.beginPath();ctx.ellipse(hx,hy,5.5,4,0,0,7);ctx.fill();ctx.beginPath();ctx.ellipse(hx+f*4,hy+1.5,3.5,2.4,0,0,7);ctx.fill();
+      poly([hx-f*2,hy-3,hx-f*7,hy-9,hx-f*1,hy-4],'#e8d8b0');poly([hx+f*1,hy-3,hx-f*2,hy-10,hx+f*3,hy-4],'#e8d8b0');
+      ctx.fillStyle=wind?'#ffffff':'#ffd84a';ctx.beginPath();ctx.arc(hx+f*1.5,hy-1,1.6,0,7);ctx.fill();
+      if(wind&&!hurt){for(let i=0;i<5;i++){ctx.fillStyle=`rgba(255,${120+i*25},40,${.7-i*.12})`;ctx.beginPath();ctx.arc(hx+f*(8+i*4),hy+2+Math.sin(t*20+i)*1.5,2.5+i*.6,0,7);ctx.fill()}}
+      else if(!hurt){ctx.fillStyle='rgba(255,140,60,.5)';ctx.beginPath();ctx.arc(hx+f*7,hy+2-((t*12)%5),1.3,0,7);ctx.fill()}}
     else{poly([ex,ey-h/2-6,ex+w/2+3,ey+h/2,ex-w/2-3,ey+h/2],C('a'));ctx.fillStyle='#000';ctx.beginPath();ctx.arc(ex,ey-2,5,0,7);ctx.fill();eyes(ex,ey-2,a,2,1.2,'#ff4dff');const ox=ex+Math.cos(a)*14,oy=ey+Math.sin(a)*10;ctx.fillStyle=wind?'#fff':'#c08aff';ctx.beginPath();ctx.arc(ox,oy,4*pu,0,7);ctx.fill()}
     return}
 }
@@ -2547,7 +2588,7 @@ function fightAnim(a,b,aEnd,bEnd,won,line,done,pvp){modal(pvp?'Arena fight':'Rai
   setTimeout(()=>{const L=$('#fL');if(L)L.innerHTML=`<b style="color:${won?'#5dd68c':'#ff9a7a'}">${line}</b>`;if(btn){btn.disabled=false;btn.textContent='OK';btn.onclick=()=>{$('#modal').classList.add('hidden');paused=false;done&&done()}}},2600)}
 
 updTabDots();
-window.__ds={idleRot,idleSet,localStats,empIntro,abyssMods,salv:salvageMats,Sim,computeStats,genItem,weekMods,mkUnique,mkMap,get S(){return S},get sim(){return sim},rollMod,simIdleRun,get pend(){return idlePending}};setTab(S.tab||'run');resize();initCloud();requestAnimationFrame(frame);
+window.__ds={SPECS,idleRot,idleSet,localStats,empIntro,abyssMods,salv:salvageMats,Sim,computeStats,genItem,weekMods,mkUnique,mkMap,get S(){return S},get sim(){return sim},rollMod,simIdleRun,get pend(){return idlePending}};setTab(S.tab||'run');resize();initCloud();requestAnimationFrame(frame);
 })();
 </script>
 </body>
