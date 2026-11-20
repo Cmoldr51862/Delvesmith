@@ -324,6 +324,12 @@ const bsplit=f=>{const B=BIOMES[biomeOf(f)].split;if(!cycOf(f))return B;const A=
 const bname=f=>BIOMES[biomeOf(f)].name+cycName(f);
 // Smooth difficulty: growth per floor starts steep and eases toward a steady rate (no biome jumps)
 const DOTC={B:'#ff5a5a',P:'#8fe36b',F:'#ffa040'};
+const SKN={fireball:{fire:'Fireball',cold:'Frost Bolt',poison:'Plague Bolt'},nova:{fire:'Fire Nova',cold:'Frost Nova',poison:'Toxic Nova'}};
+const SKD={fireball:{cold:'An icy orb that bursts for 200% in an area. Frost hits slow enemies.',poison:'A toxic orb that bursts for 200% in an area. Poison hits stack up to 5 times.'},
+  nova:{fire:'160% fire damage to everything nearby and sets them ablaze with a double-strength burn.',cold:'160% cold damage to everything nearby and freezes them solid for 1.5 seconds.',poison:'140% poison damage to everything nearby and adds 3 poison stacks.'}};
+const skD=(k,el)=>(SKD[k]&&el&&SKD[k][el])||SKILLS[k].d;
+const skN=(k,el)=>(SKN[k]&&el&&SKN[k][el])||SKILLS[k].n;
+const EL={fire:{c:'#ff9a4a',g:'rgba(255,140,50,.35)',core:'#ffd070',n:'Fire'},cold:{c:'#8fd3ff',g:'rgba(120,200,255,.35)',core:'#e6f6ff',n:'Frost'},poison:{c:'#8fe36b',g:'rgba(120,220,90,.35)',core:'#dfffc8',n:'Poison'}};
 const mkCurve=(a,b,c,t,T)=>{const C=[1,1],L=Math.log;return f=>{f=Math.max(1,Math.floor(f));while(C.length<=f){const i=C.length-1;C.push(C[i]*Math.exp(L(c)+(L(b)-L(c))*Math.exp(-(i-1)/T)+(L(a)-L(b))*Math.exp(-(i-1)/t)))}return C[f]}};
 const hpCurve0=mkCurve(1.2,1.11,1.032,14,25),dmgCurve0=mkCurve(1.14,1.082,1.024,14,25),DEEP0=55;
 const hpCurve=f=>hpCurve0(f)*Math.pow(1.02,Math.max(0,Math.floor(f)-DEEP0)),dmgCurve=f=>dmgCurve0(f)*Math.pow(1.015,Math.max(0,Math.floor(f)-DEEP0));
@@ -346,9 +352,9 @@ const BASES={
   crystalmaul:{n:'Crystal Maul',slot:'weapon',cls:'hammer',f:5,min:26,max:42,aps:.85,crit:5},
   magmasledge:{n:'Magma Sledge',slot:'weapon',cls:'hammer',f:7,min:38,max:62,aps:.85,crit:5},
   gnarledstaff:{n:'Gnarled Staff',slot:'weapon',cls:'staff',f:1,min:5,max:9,aps:1.0,crit:6},
-  sporestaff:{n:'Spore Staff',slot:'weapon',cls:'staff',f:3,min:9,max:15,aps:1.0,crit:6,imp:{addPoison:5}},
-  froststaff:{n:'Frost Staff',slot:'weapon',cls:'staff',f:5,min:13,max:21,aps:1.0,crit:6,imp:{addCold:8}},
-  emberstaff:{n:'Ember Staff',slot:'weapon',cls:'staff',f:7,min:18,max:30,aps:1.0,crit:6,imp:{addFire:12}},
+  sporestaff:{n:'Spore Staff',slot:'weapon',cls:'staff',f:3,min:9,max:15,aps:1.0,crit:6,imp:{addPoison:5},el:'poison'},
+  froststaff:{n:'Frost Staff',slot:'weapon',cls:'staff',f:5,min:13,max:21,aps:1.0,crit:6,imp:{addCold:8},el:'cold'},
+  emberstaff:{n:'Ember Staff',slot:'weapon',cls:'staff',f:7,min:18,max:30,aps:1.0,crit:6,imp:{addFire:12},el:'fire'},
   twinshivs:{n:'Twin Shivs',slot:'weapon',cls:'daggers',f:1,min:2,max:5,aps:2,crit:8},
   twinfangs:{n:'Twin Fangs',slot:'weapon',cls:'daggers',f:3,min:5,max:9,aps:2,crit:8},
   glasstwins:{n:'Glass Twins',slot:'weapon',cls:'daggers',f:5,min:7,max:12,aps:2,crit:9},
@@ -360,7 +366,10 @@ const BASES={
   voidblade:{n:'Void Blade',slot:'weapon',cls:'sword',f:10,min:30,max:50,aps:1.35,crit:6},
   voidaxe:{n:'Void Reaver',slot:'weapon',cls:'axe',f:10,min:40,max:66,aps:1.1,crit:5},
   voidmaul:{n:'Void Maul',slot:'weapon',cls:'hammer',f:10,min:54,max:90,aps:.85,crit:5},
-  voidstaff:{n:'Void Staff',slot:'weapon',cls:'staff',f:10,min:26,max:44,aps:1.0,crit:6,imp:{addCold:10,addFire:10}},
+  voidstaff:{n:'Void Staff',slot:'weapon',cls:'staff',f:10,min:26,max:44,aps:1.0,crit:6,imp:{addCold:10,addFire:10},dw:.4},
+  voidflame:{n:'Void Flame Staff',slot:'weapon',cls:'staff',f:10,min:26,max:44,aps:1.0,crit:6,imp:{addFire:20},el:'fire',dw:.4},
+  voidfrost:{n:'Void Frost Staff',slot:'weapon',cls:'staff',f:10,min:26,max:44,aps:1.0,crit:6,imp:{addCold:20},el:'cold',dw:.4},
+  voidplague:{n:'Void Plague Staff',slot:'weapon',cls:'staff',f:10,min:26,max:44,aps:1.0,crit:6,imp:{addPoison:20},el:'poison',dw:.4},
   voidfangs:{n:'Void Fangs',slot:'weapon',cls:'daggers',f:10,min:14,max:24,aps:2,crit:9},
   voidbow:{n:'Void Longbow',slot:'weapon',cls:'bow',f:10,min:24,max:40,aps:1.2,crit:7},
   voidhelm:{n:'Void Visage',slot:'helmet',f:10,armour:80},
@@ -653,7 +662,7 @@ const dropIL=f=>f+Math.floor(f/4);
 function genItem(rand,floor,boost,wk){
   if(wk){boost=(boost||0)+Math.min(.3,(floor-1)*.01);floor=dropIL(floor)}
   const keys=Object.keys(BASES).filter(k=>BASES[k].f<=floor);
-  const ws=keys.map(k=>(BASES[k].f>=floor-5?3:1)*(floor>=40?1+2*Math.pow(BASES[k].f/floor,2):1));let s=ws.reduce((a,b)=>a+b,0),q=rand()*s,base=keys[0];
+  const ws=keys.map(k=>(BASES[k].dw||1)*(BASES[k].f>=floor-5?3:1)*(floor>=40?1+2*Math.pow(BASES[k].f/floor,2):1));let s=ws.reduce((a,b)=>a+b,0),q=rand()*s,base=keys[0];
   for(let i=0;i<keys.length;i++){q-=ws[i];if(q<0){base=keys[i];break}}
   const it=newItem(base,floor);const r=rand();
   if(r<.05+boost*.3){it.rarity=2;it.name=rareName(rand);const n=3+Math.floor(rand()*3);for(let i=0;i<n;i++)rollMod(it,rand)}
@@ -670,7 +679,7 @@ function itemHTML(it,newMods){
      for(const t of ['fire','cold','poison'])if(L[t])h+=`<br>${TNAME[t]} Damage: <b style="color:${TCOL[t]}">${L[t][0]}–${L[t][1]}</b>`;
      h+=`<br>Attacks per Second: ${aug(Math.round(L.aps*100)/100,L.apsAug)}<br>Critical Hit Chance: ${aug(Math.round(L.crit*10)/10+'%',L.critAug)}<br><span style="color:#a99fb8">Weapon DPS: ${Math.round(L.dps*10)/10}${(L.physAug||L.apsAug||L.fire||L.cold||L.poison)?` <small>(base ${Math.round((b.min+b.max)/2*b.aps*10)/10})</small>`:''}</span></div>`}
    if(L.armour&&(b.armour||L.armAug))h+=`<div class="iprop">Armour: ${aug(L.armour,L.armAug)}${L.armAug?` <small style="color:#a99fb8">(base ${(b.armour||0)+((b.imp&&b.imp.armour)||0)})</small>`:''}</div>`;}
-  if(b.cls)h+=`<div class="note" style="margin-top:4px">Skills: ${WCLASS[b.cls].skills.map(k=>SKILLS[k].n).join(' · ')}</div>`;
+  if(b.cls)h+=`<div class="note" style="margin-top:4px">Skills: ${WCLASS[b.cls].skills.map(k=>skN(k,b.el)).join(' · ')}${b.el?` <span style="color:${EL[b.el].c}">· ${EL[b.el].n} staff: attacks deal mostly ${b.el==='cold'?'cold':b.el} damage and ${b.el==='fire'?'burn':b.el==='cold'?'slow':'stack poison on'} enemies</span>`:''}</div>`;
   const em=1+.05*(it.emp||0),ev=v=>em===1?v:(Math.abs(v*em)>=10?Math.round(v*em):Math.round(v*em*10)/10),eb=em>1?` <small style="color:#ffb070">(+${Math.round((em-1)*100)}%)</small>`:'';
   if(b.imp){h+='<div class="ihr"></div>';for(const k in b.imp)h+=`<div class="imp">${DESC[k](ev(b.imp[k]))}${eb}</div>`}
   if(it.mods.length){h+='<div class="ihr"></div>';
@@ -708,11 +717,11 @@ function computeStats(eq){
     const em=1+.05*(it.emp||0);if(b.imp)for(const k in b.imp)if(k!=='armour')s[k]+=b.imp[k]*em;
     for(const m of it.mods){if(m.a==='armour'||m.a==='incArmour')continue;if(sl==='weapon'&&LOCALW.includes(m.a))continue;s[m.a]+=m.v*em}
     if(sl==='weapon')w=L}
-  const wclass=eq.weapon&&BASES[eq.weapon.base].cls||'sword';
+  const wclass=eq.weapon&&BASES[eq.weapon.base].cls||'sword',sEl=wclass==='staff'&&eq.weapon&&BASES[eq.weapon.base].el||null;
   for(const n of TREE){if(n.cls&&n.cls!==wclass)continue;const r=(S.tree&&S.tree[n.id])||0;if(r)for(const k in n.st)s[k]=(s[k]||0)+n.st[k]*r}
   if(wclass==='staff'){s.spellDmg=(s.spellDmg||0)+(s.clsDmg||0);s.incAps+=(s.castSpd||0)}else s.attackDmg=(s.attackDmg||0)+(s.clsDmg||0);
   if(!w)w={min:2,max:4,aps:1.2,crit:5};
-  const o={wclass,u:Object.fromEntries(EQ.map(k=>eq[k]).filter(i=>i&&i.uq).map(i=>[UNIQ[i.uq].fx,1])),m:Object.fromEntries(Object.keys(s).filter(k=>k.startsWith('mod_')&&s[k]).map(k=>[k.slice(4),1])),attackDmg:s.attackDmg||0,spellDmg:s.spellDmg||0,eleDmg:s.eleDmg||0,rangeInc:s.rangeInc||0,areaInc:s.areaInc||0,surge:s.surge||0,archmage:s.archmage||0,skillDmg:s.skillDmg,cdr:s.cdr,berserk:s.berserk,bloodlust:s.bloodlust,secondWind:s.secondWind,execute:s.execute,unbreak:s.unbreak,treasure:s.treasure,life:Math.round(s.life),armour:Math.round(s.armour*(1+s.treeArmour/100)),wmin:w.min,wmax:w.max,aps:Math.round(w.aps*(1+s.incAps/100)*100)/100,
+  const o={wclass,sEl,u:Object.fromEntries(EQ.map(k=>eq[k]).filter(i=>i&&i.uq).map(i=>[UNIQ[i.uq].fx,1])),m:Object.fromEntries(Object.keys(s).filter(k=>k.startsWith('mod_')&&s[k]).map(k=>[k.slice(4),1])),attackDmg:s.attackDmg||0,spellDmg:s.spellDmg||0,eleDmg:s.eleDmg||0,rangeInc:s.rangeInc||0,areaInc:s.areaInc||0,surge:s.surge||0,archmage:s.archmage||0,skillDmg:s.skillDmg,cdr:s.cdr,berserk:s.berserk,bloodlust:s.bloodlust,secondWind:s.secondWind,execute:s.execute,unbreak:s.unbreak,treasure:s.treasure,life:Math.round(s.life),armour:Math.round(s.armour*(1+s.treeArmour/100)),wmin:w.min,wmax:w.max,aps:Math.round(w.aps*(1+s.incAps/100)*100)/100,
     crit:Math.round(w.crit*(1+s.incCrit/100)*10)/10,critMulti:s.critMulti,addPhys:s.addPhys,incPhys:s.incPhys,addFire:s.addFire,addCold:s.addCold,addPoison:s.addPoison,
     res:{phys:0,fire:Math.min(75,s.fireRes+s.allRes),cold:Math.min(75,s.coldRes+s.allRes),poison:Math.min(75,s.poisonRes+s.allRes)},resRaw:{fire:s.fireRes+s.allRes,cold:s.coldRes+s.allRes,poison:s.poisonRes+s.allRes},regen:Math.round(s.regen*10)/10,lifeOnHit:s.lifeOnHit,
     lootFind:s.lootFind,ms:s.ms,speed:150*(1+s.ms/100),bag:Math.floor(25+s.bagCap),dodge:Math.min(80,s.dodge)};
@@ -897,7 +906,7 @@ class Sim{
   ring(x,y,r,c,dur){if(this.visual)this.L.rings.push({x,y,r,c,t:0,max:dur||.35})}
   aoe(x,y,r,mult,extra,c){r*=(1+(this.st.areaInc||0)/100)*(this.curSpec==='wide'?1.35:1);for(const e of this.near(r,x,y)){this.hitEnemy(e,mult);if(extra&&e.hp>0)extra(e);if(this.done)return}this.cleanup();this.ring(x,y,r,c||'#ffffff')}
   nearest(maxD,needLos){const c=this.pc();let b=null,bd=1e9;for(const e of this.L.enemies){if(e.hp<=0)continue;const d=Math.hypot(e.x+e.w/2-c.x,e.y+e.h/2-c.y);if(d<maxD&&d<bd&&(!needLos||los(this.L,c.x,c.y,e.x+e.w/2,e.y+e.h/2,4))){bd=d;b=e}}return b}
-  shoot(kind,ang,mult,aoe){const c=this.pc(),sp=kind==='arrow'?520:kind==='bolt'?430:360;this.L.pshots.push({kind,x:c.x+Math.cos(ang)*12,y:c.y+Math.sin(ang)*12,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,mult,aoe:aoe||0,life:1.2})}
+  shoot(kind,ang,mult,aoe){const c=this.pc(),sp=kind==='arrow'?520:kind==='bolt'?430:360;this.L.pshots.push({kind,el:this.st.sEl,x:c.x+Math.cos(ang)*12,y:c.y+Math.sin(ang)*12,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,mult,aoe:aoe||0,life:1.2})}
   specOf(id){const M=this.st.m||{};for(const [c] of SPECS[id]||[])if(M['sp_'+id+'_'+c])return c;return null}
   cast(id){
     if(this.done)return 'The run is over';
@@ -927,7 +936,11 @@ class Sim{
       case 'quake':{const x=c.x,y=c.y,R=M.fault?180:120;this.ring(x,y,R*(1+(this.st.areaInc||0)/100),'#ff9a4a',1);this.ev.push({at:this.t+1,f:()=>this.aoe(x,y,R,3,null,'#ffb070')});break}
       case 'iron':this.buff.iron=6;break;
       case 'fireball':{t=this.nearest(rng,true);if(!t)return 'No target in sight';p.ang=ang(t);p.swing=p.swingMax=.24;if(M.splitfire){for(const o of [-.28,0,.28])this.shoot('fireball',p.ang+o,1.2,50)}else this.shoot('fireball',p.ang,2,60);break}
-      case 'nova':{if(!this.near(100,c.x,c.y).length)return 'No enemies nearby';this.aoe(c.x,c.y,100,1.2,e=>{e.slow=3;if(M.deepfreeze)e.stun=Math.max(e.stun||0,e.boss?.3:1)},'#8fd3ff');break}
+      case 'nova':{if(!this.near(100,c.x,c.y).length)return 'No enemies nearby';const el=this.st.sEl;
+        if(el==='cold')this.aoe(c.x,c.y,100,1.6,e=>{e.slow=3;e.stun=Math.max(e.stun||0,e.boss?(M.deepfreeze?.6:.4):(M.deepfreeze?2:1.5))},'#bfe8ff');
+        else if(el==='fire')this.aoe(c.x,c.y,100,1.6,e=>{if(e.burnU>this.t)e.burnD*=2;if(M.deepfreeze)e.stun=Math.max(e.stun||0,e.boss?.3:1)},'#ff9a4a');
+        else if(el==='poison')this.aoe(c.x,c.y,100,1.4,e=>{if(e.poisU>this.t)e.poisS=Math.min(5,e.poisS+2);if(M.deepfreeze)e.stun=Math.max(e.stun||0,e.boss?.3:1)},'#8fe36b');
+        else this.aoe(c.x,c.y,100,1.2,e=>{e.slow=3;if(M.deepfreeze)e.stun=Math.max(e.stun||0,e.boss?.3:1)},'#8fd3ff');break}
       case 'heal':{if(this.life>=this.st.life)return 'Already at full Life';this.life=Math.min(this.st.life,this.life+this.st.life*.3);if(M.regrowth)this.buff.regrow=5;this.pfx(c.x,c.y,'#7ee36b',16,120);this.ring(c.x,c.y,40,'#7ee36b',.5);break}
       case 'flurry':{t=this.nearest(this.P.w/2+30+wc.reach,false);if(!t)return 'No enemy in reach';const tt=t,n=M.thousand?9:6;p.ang=ang(t);p.channel=n*.1;for(let i=0;i<n;i++)this.ev.push({at:this.t+i*.1,f:()=>{if(tt.hp>0){p.swing=p.swingMax=.09;p.alt=!p.alt;this.hitEnemy(tt,.6);this.cleanup()}}});break}
       case 'shadow':{t=this.nearest(5*TS,false);if(!t)return 'No target within 5 tiles';const a=ang(t),tx=t.x+t.w/2+Math.cos(a)*(t.w/2+14),ty=t.y+t.h/2+Math.sin(a)*(t.h/2+14);
@@ -939,7 +952,7 @@ class Sim{
       case 'disengage':{t=this.nearest(3*TS,false);if(M.parting&&t){const a2=ang(t);for(const o of [-.15,0,.15])this.shoot('arrow',a2+o,.8)}const a=t?ang(t)+Math.PI:p.ang+Math.PI;p.dash={vx:Math.cos(a)*520,vy:Math.sin(a)*520,t:.28};this.buff.haste=Math.max(this.buff.haste||0,3);break}
     }
     if(id==='fireball'&&(this.st.u||{}).twinfire){const a0=p.ang;this.ev.push({at:this.t+.3,f:()=>{if(M.splitfire){for(const o of [-.28,0,.28])this.shoot('fireball',a0+o,1.2,50)}else this.shoot('fireball',a0,2,60)}})}
-    this.cds[id]=sk.cd;if((this.st.u||{}).echo&&this.rng()<.25){this.cds[id]=0;this.fx(c.x,p.y-34,'Echo!','#ff9a3a')}this.fx(c.x,p.y-22,sk.n+'!','#ffd36a');this.casts=(this.casts||0)+1;
+    this.cds[id]=sk.cd;if((this.st.u||{}).echo&&this.rng()<.25){this.cds[id]=0;this.fx(c.x,p.y-34,'Echo!','#ff9a3a')}this.fx(c.x,p.y-22,skN(id,this.st.sEl)+'!','#ffd36a');this.casts=(this.casts||0)+1;
     return '';
   }
   fightEval(eng,ehp,inc,net){
@@ -1046,18 +1059,20 @@ class Sim{
   hitEnemy(e,mult,forceCrit,quiet){const isSk=mult!=null&&!quiet,SP=isSk?this.curSpec:null,m0=mult;if(SP==='power')mult*=1.5;mult=(mult||1)*(this.buff.cry>0?1.4:1)*(1+((this.st.wclass==='staff'?this.st.spellDmg:this.st.attackDmg)||0)/100)*(this.st.m&&this.st.m.choke&&this.buff.smoke>0?1.2:1)*(isSk?1+(this.st.skillDmg||0)/100:1)*(this.st.execute&&e.hp<e.max*.35?1.5:1);
     const st=this.st,B=BIOMES[this.L.b],r=()=>.75+this.rng()*.5;
     const d={phys:(st.wmin+this.rng()*(st.wmax-st.wmin)+st.addPhys*r())*(1+st.incPhys/100),fire:st.addFire*r()*(1+(st.eleDmg||0)/100),cold:st.addCold*r()*(1+(st.eleDmg||0)/100),poison:st.addPoison*r()*(1+(st.eleDmg||0)/100)};
-    const crit=forceCrit||SP==='execute'||this.rng()<st.crit/100,cm=crit?st.critMulti/100:1;let tot=0;
+    if(st.sEl){const cv=d.phys*.75;d.phys-=cv;d[st.sEl]+=cv*(1+(st.eleDmg||0)/100)}
+    const crit=this.flatDmg==null&&(forceCrit||SP==='execute'||this.rng()<st.crit/100),cm=crit?st.critMulti/100:1;let tot=0;
     for(const k of TYPES)tot+=d[k]*cm*(1-(B.eres[k]||0));
-    tot=Math.max(1,tot*mult);e.hp-=tot;e.hurt=.12;if(e.engT==null)e.engT=this.t;const kbs=quiet?0:isSk?110:({hammer:130,axe:70,sword:35}[this.st.wclass]||0);if(!e.boss&&kbs&&e.wind<=0){const ka=Math.atan2(e.y+e.h/2-this.P.y-9,e.x+e.w/2-this.P.x-9);e.kb=.1;e.kbx=Math.cos(ka)*kbs;e.kby=Math.sin(ka)*kbs}e.aggro=true;
+    tot=Math.max(1,tot*mult);if(this.flatDmg!=null)tot=this.flatDmg;e.hp-=tot;e.hurt=.12;if(e.engT==null)e.engT=this.t;const kbs=quiet?0:isSk?110:({hammer:130,axe:70,sword:35}[this.st.wclass]||0);if(!e.boss&&kbs&&e.wind<=0){const ka=Math.atan2(e.y+e.h/2-this.P.y-9,e.x+e.w/2-this.P.x-9);e.kb=.1;e.kbx=Math.cos(ka)*kbs;e.kby=Math.sin(ka)*kbs}e.aggro=true;
     this.dealt+=tot;this.hits.push({t:this.t,d:tot});
-    if(st.lifeOnHit)this.life=Math.min(st.life,this.life+st.lifeOnHit);
+    if(st.lifeOnHit&&!this.tickK)this.life=Math.min(st.life,this.life+st.lifeOnHit);
+    if(st.sEl&&!this.tickK&&e.hp>0){const el=st.sEl;if(el==='cold')e.slow=Math.max(e.slow||0,1.5);else if(el==='fire'){const bd=tot*.2;if(!(e.burnU>this.t)||bd>e.burnD)e.burnD=bd;e.burnU=this.t+3;this.applyDot(e,'F',3)}else{const on=e.poisU>this.t;e.poisS=on?Math.min(5,e.poisS+1):1;e.poisP=Math.max(on?e.poisP:0,tot*.04);e.poisU=this.t+3;this.applyDot(e,'P',3)}}
     if(SP&&e.hp>0){if(SP==='chill')e.slow=Math.max(e.slow||0,2);else if(SP==='stun')e.stun=Math.max(e.stun||0,e.boss?.2:.6);else if(SP.startsWith('dot')){const ee=e,mm=m0*.25,dk=SP[3];this.applyDot(ee,dk,3.05);for(let i=1;i<=3;i++)this.ev.push({at:this.t+i,f:()=>{if(ee.hp>0){const o=this.curSpec;this.curSpec=null;this.tickK=dk;this.hitEnemy(ee,mm,false,true);this.tickK=null;this.curSpec=o;this.cleanup()}}})}}
     if(SP==='leech')this.life=Math.min(st.life,this.life+st.life*.02);
     const U=st.u||{};
     if(U.leech)this.life=Math.min(st.life,this.life+tot*.02);
     if(U.prism&&crit&&!(this.prismCd>this.t)){this.prismCd=this.t+.25;let o=null,od=1e9;for(const q of this.L.enemies){if(q===e||q.hp<=0)continue;const dd=Math.hypot(q.x-e.x,q.y-e.y);if(dd<4*TS&&dd<od){od=dd;o=q}}
       if(o){const sx=e.x+e.w/2,sy=e.y+e.h/2,a2=Math.atan2(o.y+o.h/2-sy,o.x+o.w/2-sx);this.L.pshots.push({kind:'bolt',x:sx,y:sy,vx:Math.cos(a2)*430,vy:Math.sin(a2)*430,mult:.5,aoe:0,life:1,skip:e})}}
-    if(U.tremor&&!isSk&&this.rng()<.2){const ex2=e.x+e.w/2,ey2=e.y+e.h/2;this.ev.push({at:this.t+.05,f:()=>this.aoe(ex2,ey2,60,.8,null,'#d8c8a8')})}
+    if(U.tremor&&!isSk&&!this.tickK&&this.rng()<.2){const ex2=e.x+e.w/2,ey2=e.y+e.h/2;this.ev.push({at:this.t+.05,f:()=>this.aoe(ex2,ey2,60,.8,null,'#d8c8a8')})}
     const tk=this.tickK;this.fx(e.x+e.w/2+(tk?8:0),e.y-4-(tk?6:0),Math.round(tot)+(crit?'!':''),tk?DOTC[tk]:crit?'#ffd84a':'#ffffff');this.pfx(e.x+e.w/2,e.y+e.h/2,B.enemy,5);
     if(e.hp<=0){
       this.kills++;if(this.st.bloodlust){if(this.t>(this.bloodT||0))this.blood=0;this.blood=Math.min(5,(this.blood||0)+1);this.bloodT=this.t+4}this.killTimes.push(this.t-e.engT);const x=e.x+e.w/2,y=e.y;
@@ -1094,6 +1109,7 @@ class Sim{
     const s=this,p=s.P,L=s.L,st=s.st,B=BIOMES[L.b];
     s.t+=dt;p.atkCd-=dt;p.swing-=dt;p.hurt-=dt;p.inv-=dt;p.repath-=dt;
     s.tickSkills(dt);if(s.done)return;const wc=s.wc();
+    for(const e of L.enemies){if(e.hp<=0)continue;const bu=e.burnU>s.t,pu=e.poisU>s.t;if(!bu&&!pu){e.dtk=0;continue}e.dtk=(e.dtk||0)+dt;if(e.dtk>=1){e.dtk-=1;for(const [k,v] of [['F',bu?e.burnD:0],['P',pu?e.poisS*e.poisP:0]])if(v>0&&e.hp>0){s.tickK=k;s.flatDmg=v;s.hitEnemy(e,null,false,true);s.flatDmg=null;s.tickK=null}s.cleanup();if(s.done)return}}
     if(s.banner){s.banner.t-=dt;if(s.banner.t<=0)s.banner=null}
     s.life=Math.min(st.life,s.life+(L.modset&&L.modset.drained?0:st.regen)*dt);
     const hp=s.life/st.life*100,pcx=p.x+p.w/2,pcy=p.y+p.h/2;
@@ -1243,7 +1259,7 @@ class Sim{
     for(const q of L.pshots){q.x+=q.vx*dt;q.y+=q.vy*dt;q.life-=dt;let boom=false,hitE=null;
       if(tileAt(L,Math.floor(q.x/TS),Math.floor(q.y/TS))===1){q.life=0;boom=true}
       else for(const e of L.enemies){if(e.hp>0&&e!==q.skip&&!(q.hit&&q.hit.has(e))&&Math.hypot(e.x+e.w/2-q.x,e.y+e.h/2-q.y)<Math.max(e.w,e.h)/2+5){hitE=e;if(q.kind==='arrow'&&(st.u||{}).pierce){(q.hit=q.hit||new Set()).add(e);{const o0=s.curSpec;s.curSpec=q.spec||null;s.hitEnemy(e,q.mult==null?undefined:q.mult);s.curSpec=o0}s.cleanup();if(s.done)return;hitE=null;continue}q.life=0;boom=true;break}}
-      if(boom){const o0=s.curSpec;s.curSpec=q.spec||null;if(q.aoe)s.aoe(q.x,q.y,q.aoe,q.mult,null,'#ff9a4a');else if(hitE){s.hitEnemy(hitE,q.mult==null?undefined:q.mult);s.cleanup()}s.curSpec=o0;if(s.done)return}}
+      if(boom){const o0=s.curSpec;s.curSpec=q.spec||null;if(q.aoe)s.aoe(q.x,q.y,q.aoe,q.mult,null,q.el?EL[q.el].c:'#ff9a4a');else if(hitE){s.hitEnemy(hitE,q.mult==null?undefined:q.mult);s.cleanup()}s.curSpec=o0;if(s.done)return}}
     L.pshots=L.pshots.filter(q=>q.life>0);
     if(s.visual){for(const r of L.rings)r.t+=dt;L.rings=L.rings.filter(r=>r.t<r.max)}
     for(const c of L.chests)if(!c.open&&overlap(p,c)){
@@ -1431,7 +1447,7 @@ function nodeModal(n){
   const per=n.d||Object.entries(n.st).map(([k,v])=>TSD[k](v)).join(', ')+(n.cls&&n.st.clsDmg?` with ${WCLASS[n.cls].n}s`:n.cls?` with ${WCLASS[n.cls].n}s`:'');
   let tag=n.kind==='key'?' · KEYSTONE':n.kind==='notable'?' · NOTABLE':n.kind==='mod'?` · CHANGES ${SKILLS[n.sk].n.toUpperCase()}`:n.kind==='spec'?` · ${SKILLS[n.sk].n.toUpperCase()} SPECIALIZATION`:'';
   let b=`<div class="note" style="color:${TBR[n.b].c};margin-bottom:6px">${n.cls?WCLASS[n.cls].n.toUpperCase():TBR[n.b].n}${tag}</div><div style="font-size:15px;margin-bottom:8px">${per}${n.max>1?' per point':''}</div>`;
-  if(n.sk)b+=`<div class="note" style="margin-bottom:6px">Normally: ${SKILLS[n.sk].d}</div>`;
+  if(n.sk)b+=`<div class="note" style="margin-bottom:6px">Normally: ${n.cls==="staff"?skD(n.sk,computeStats(S.eq).sEl):SKILLS[n.sk].d}</div>`;
   if(n.cls)b+=`<div class="note" style="margin-bottom:6px">Only works while a ${WCLASS[n.cls].n} is equipped.</div>`;
   if(n.max>1)b+=`<div class="note">Rank ${rk}/${n.max}${rk?` · currently ${Object.entries(n.st).map(([k,v])=>TSD[k](Math.round(v*rk*10)/10)).join(', ')}`:''}</div>`;
   if(n.grp)b+=`<div class="note" style="margin-bottom:6px">Pick <b>one</b> of the three ${SKILLS[n.sk].n} specializations. Resetting the tree lets you choose again.</div>`;
@@ -1684,7 +1700,7 @@ function viewGear(){
     <div class="row"><b>Armour</b><span>${Math.round(st.armour)}</span></div>
     <div class="row"><b>Poison / Cold / Fire res<small style="display:block;font-weight:500;color:var(--dim);font-size:11px">max 75% · <span style="color:#ffb070">+N</span> = wasted over the cap</small></b><span><span style="color:${TCOL.poison}">${Math.round(st.res.poison)}%${st.resRaw.poison>75.5?`<small style="color:#ffb070"> +${Math.round(st.resRaw.poison-75)}</small>`:''}</span> / <span style="color:${TCOL.cold}">${Math.round(st.res.cold)}%${st.resRaw.cold>75.5?`<small style="color:#ffb070"> +${Math.round(st.resRaw.cold-75)}</small>`:''}</span> / <span style="color:${TCOL.fire}">${Math.round(st.res.fire)}%${st.resRaw.fire>75.5?`<small style="color:#ffb070"> +${Math.round(st.resRaw.fire-75)}</small>`:''}</span></span></div>
     <div class="row"><b>Sustain</b><span>${Math.round(st.regen*10)/10} regen/s · ${Math.round(st.lifeOnHit*10)/10} life per hit</span></div>
-    <div class="row"><b>Weapon type</b><span>${WCLASS[st.wclass].n}${WCLASS[st.wclass].range?' (ranged)':''} · ${WCLASS[st.wclass].skills.map(k=>SKILLS[k].n).join(', ')}</span></div>
+    <div class="row"><b>Weapon type</b><span>${WCLASS[st.wclass].n}${WCLASS[st.wclass].range?' (ranged)':''} · ${WCLASS[st.wclass].skills.map(k=>skN(k,st.sEl)).join(', ')}</span></div>
     <div class="row"><b>Hazard Dodge</b><span>${Math.round(st.dodge)}%${st.dodge?'':' (the runner won\'t sidestep puddles, vents or darts)'}</span></div>
     <div class="row"><b>Utility</b><span>${Math.round(st.ms)}% move · ${Math.round(st.lootFind)}% materials · bag ${rn(st.bag)}</span></div>
     <button class="btn" id="bestBtn" style="margin-top:10px" ${S.idle?'disabled':''}>Equip best gear</button></div>`;
@@ -2358,7 +2374,7 @@ function draw(){
         if(k==='B'){ctx.beginPath();ctx.ellipse(ex+ox,ey-r*.2+ph*(r+8),1.6,2.4,0,0,7);ctx.fill()}
         else if(k==='F'){ctx.beginPath();ctx.moveTo(ex+ox-2.5,oy+3);ctx.quadraticCurveTo(ex+ox,oy-5,ex+ox+2.5,oy+3);ctx.closePath();ctx.fill()}
         else{ctx.beginPath();ctx.arc(ex+ox,oy,2+ph*1.5,0,7);ctx.fill()}}ctx.globalAlpha=1;
-      ctx.font='bold 9px system-ui';ctx.textAlign='center';ctx.fillStyle=c;ctx.fillText(k==='B'?'BLEED':k==='F'?'BURN':'POISON',ex,e.y-14+(e.stun>0?-10:0));ctx.font='bold 10px system-ui,sans-serif'}
+      ctx.font='bold 9px system-ui';ctx.textAlign='center';ctx.fillStyle=c;ctx.fillText(k==='B'?'BLEED':k==='F'?'BURN':'POISON'+(e.poisU>s.t&&e.poisS>1?' x'+e.poisS:''),ex,e.y-14+(e.stun>0?-10:0));ctx.font='bold 10px system-ui,sans-serif'}
     if(e.stun>0){ctx.fillStyle='#ffd84a';ctx.fillText('★ ★',ex,e.y-12)}if(e.slow>0){ctx.strokeStyle='#8fd3ff';ctx.lineWidth=2;ctx.beginPath();ctx.arc(ex,ey,e.w/2+3,0,7);ctx.stroke()}
     if(e.hp<e.max&&!e.boss){ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillRect(e.x,e.y-9,e.w,3);ctx.fillStyle='#ff6b6b';ctx.fillRect(e.x,e.y-9,e.w*Math.max(0,e.hp/e.max),3)}}
   // runner
@@ -2377,7 +2393,7 @@ function draw(){
    if(cls==='hammer'&&k>=.78&&!P.slamFx){P.slamFx=1;L.rings.push({x:bx+Math.cos(a)*30,y:by+Math.sin(a)*30,r:26,c:'#d8c8a8',t:0,max:.3})}if(k<.5)P.slamFx=0;
    if(s.state==='retreat'){ctx.fillStyle='#ff9a7a';ctx.fillText('RETREATING',pcx,P.y-14)}}
   for(const q of L.pshots){if(q.kind==='arrow'){const a=Math.atan2(q.vy,q.vx);ctx.strokeStyle='#e8e2d6';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(q.x,q.y);ctx.lineTo(q.x-Math.cos(a)*14,q.y-Math.sin(a)*14);ctx.stroke();ctx.fillStyle='#e8e2d6';ctx.beginPath();ctx.arc(q.x,q.y,2.5,0,7);ctx.fill()}
-    else{const big=q.kind==='fireball';ctx.fillStyle=big?'rgba(255,140,50,.35)':'rgba(180,140,255,.35)';ctx.beginPath();ctx.arc(q.x,q.y,big?12:8,0,7);ctx.fill();ctx.fillStyle=big?'#ffd070':'#e6d8ff';ctx.beginPath();ctx.arc(q.x,q.y,big?6:4,0,7);ctx.fill()}}
+    else{const big=q.kind==='fireball',E=q.el&&EL[q.el];ctx.fillStyle=E?E.g:big?'rgba(255,140,50,.35)':'rgba(180,140,255,.35)';ctx.beginPath();ctx.arc(q.x,q.y,big?12:8,0,7);ctx.fill();ctx.fillStyle=E?E.core:big?'#ffd070':'#e6d8ff';ctx.beginPath();ctx.arc(q.x,q.y,big?6:4,0,7);ctx.fill()}}
   for(const r of L.rings){const k=r.t/r.max;ctx.strokeStyle=r.c;ctx.globalAlpha=Math.max(0,1-k);ctx.lineWidth=3;ctx.beginPath();ctx.arc(r.x,r.y,r.max>.6?r.r:r.r*(.3+.7*k),0,7);ctx.stroke();if(r.max>.6){ctx.fillStyle=r.c;ctx.globalAlpha=.12;ctx.beginPath();ctx.arc(r.x,r.y,r.r*k,0,7);ctx.fill()}ctx.globalAlpha=1}
   for(const q of L.parts){ctx.globalAlpha=Math.min(1,q.life*2);ctx.fillStyle=q.c;ctx.fillRect(q.x-1.5,q.y-1.5,3,3)}ctx.globalAlpha=1;
   ctx.font='bold 11px system-ui,sans-serif';
@@ -2410,9 +2426,9 @@ function draw(){
 }
 let lastLog=-1;
 function buildSkillBar(auto){
-  const wcl=WCLASS[computeStats(S.eq).wclass],bar=$('#skillBar');bar.classList.toggle('auto',!!auto);
-  bar.innerHTML=wcl.skills.map(k=>`<button data-skill="${k}"><span class="cdv"></span><span style="position:relative">${SKILLS[k].n}<small>${auto?'AUTO':S.set.autoLive?'auto · tap':'tap'}</small></span></button>`).join('');
-  if(auto&&sim&&sim.st)bar.innerHTML=WCLASS[sim.st.wclass||'sword'].skills.map(k=>`<button data-skill="${k}" disabled><span class="cdv"></span><span style="position:relative">${SKILLS[k].n}<small>AUTO</small></span></button>`).join('');
+  const cst=computeStats(S.eq),wcl=WCLASS[cst.wclass],bar=$('#skillBar'),sel=auto&&sim&&sim.st?sim.st.sEl:cst.sEl;bar.classList.toggle('auto',!!auto);
+  bar.innerHTML=wcl.skills.map(k=>`<button data-skill="${k}"><span class="cdv"></span><span style="position:relative">${skN(k,sel)}<small>${auto?'AUTO':S.set.autoLive?'auto · tap':'tap'}</small></span></button>`).join('');
+  if(auto&&sim&&sim.st)bar.innerHTML=WCLASS[sim.st.wclass||'sword'].skills.map(k=>`<button data-skill="${k}" disabled><span class="cdv"></span><span style="position:relative">${skN(k,sel)}<small>AUTO</small></span></button>`).join('');
   if(!auto&&sim){sim.auto=!!S.set.autoLive;bar.insertAdjacentHTML('beforeend',`<button id="autoTgl" style="flex:0 0 58px;${S.set.autoLive?'border-color:#5dd68c;color:#5dd68c;background:#16261c':''}"><span style="position:relative">AUTO<small>${S.set.autoLive?'on':'off'}</small></span></button>`);
     $('#autoTgl').onclick=()=>{S.set.autoLive=!S.set.autoLive;persist();if(sim)sim.auto=S.set.autoLive;buildSkillBar(false);toast(S.set.autoLive?'Skills will cast automatically. You can still tap them yourself.':'Auto skills off. Tap to cast.')}}
   bar.querySelectorAll('[data-skill]').forEach(b=>b.onclick=()=>{if(!sim||auto)return;const r=sim.cast(b.dataset.skill);if(r)toast(r)});
