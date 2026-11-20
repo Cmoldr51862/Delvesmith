@@ -2240,12 +2240,12 @@ function computeGuildBuff(){const wk=weekId(),ms=SOC.members;if(!ms.length)retur
   if(last>=goalFor(ms.length)){if(!S.gbuff||S.gbuff.w!==wk){S.gbuff={w:wk,pct:15};persist();toast('Your guild hit last week\'s goal: +15% materials this week!')}}}
 // ---------- view
 function viewSocial(){const t=S.socTab||'guild';
-  let h=`<h1>SOCIAL</h1><div class="chips" style="margin:0 0 12px;gap:6px">${[['guild','Guild'],['market','Market']].map(([k,n])=>`<button class="btn small ${t===k?'':'ghost'}" data-soc="${k}" style="width:auto;flex:1">${n}</button>`).join('')}</div>`;
+  let h=`<h1>SOCIAL</h1><div class="chips" style="margin:0 0 12px;gap:6px">${[['guild','Guild'],['raid','Raid'],['arena','Arena'],['market','Market']].map(([k,n])=>`<button class="btn small ${t===k?'':'ghost'}" data-soc="${k}" style="width:auto;flex:1;min-width:0;padding:8px 2px;font-size:12px">${n}</button>`).join('')}</div>`;
   if(!USE_FB){h+=`<div class="card"><div class="note">Guilds and trading run on the online version of Delvesmith. Open it from your GitHub link.</div></div>`;$('#view').innerHTML=h;bindSocTabs();return}
   if(!fbUser){h+=`<div class="card"><h3>Sign in to play together</h3><div class="note" style="margin-bottom:8px">Guilds and the market need an account so your items and guild stay yours.</div><div class="btnrow"><button class="btn small" id="sG">Sign in with Google</button><button class="btn small ghost" id="sE">Use email</button></div></div>`;
     $('#view').innerHTML=h;bindSocTabs();$('#sG').onclick=fbSignInGoogle;$('#sE').onclick=fbEmailModal;return}
   h+='<div id="socBody"><div class="note">Loading…</div></div>';$('#view').innerHTML=h;bindSocTabs();
-  socOff();if(t==='guild')guildView();else marketView()}
+  socOff();if(t==='guild')guildView();else if(t==='raid')raidView();else if(t==='arena')arenaView();else marketView()}
 function bindSocTabs(){document.querySelectorAll('[data-soc]').forEach(b=>b.onclick=()=>{S.socTab=b.dataset.soc;persist();viewSocial()})}
 const SB=()=>document.getElementById('socBody');
 // ---------- guild
@@ -2347,6 +2347,71 @@ async function claimSales(){if(claiming||!(FB&&fbUser))return;claiming=true;cons
       toast(`Sold ${itemName(t.item)} to ${t.buyerName||'someone'}!`);try{await F.updateDoc(F.doc(FB.db,'trades',t.id),{status:'claimed'});await F.deleteDoc(F.doc(FB.db,'trades',t.id))}catch(e){}}
     for(const t of mine)if(t.status==='cancelled'||t.status==='claimed'){try{await F.deleteDoc(F.doc(FB.db,'trades',t.id))}catch(e){}}}catch(e){}
   claiming=false}
+
+// ===================== RAIDS + ARENA =====================
+const dayId=()=>Math.floor((Date.now()/86400000));
+const RAID_PER_DAY=3,ARENA_PER_DAY=5;
+const RAIDN=['The Hollow King','Gloom Leviathan','Ember Colossus','Rime Matriarch','The Unmaker','Ashen Wyrm','Void Shepherd'];
+function usesLeft(key,per){const o=S[key];return o&&o.d===dayId()?Math.max(0,per-o.n):per}
+function useOne(key){const d=dayId();if(!S[key]||S[key].d!==d)S[key]={d,n:0};S[key].n++;persist()}
+function raidLevel(ms){const avg=ms.length?ms.reduce((a,m)=>a+(m.best||1),0)/ms.length:1;return Math.max(3,Math.round(avg*.9))}
+// ---- raid
+async function raidView(){const F=FB.F,b=SB();if(!S.guild){b.innerHTML='<div class="card"><h3>Party raid</h3><div class="note">Raids are a guild activity. Join or start a guild in the Guild tab first.</div></div>';return}
+  try{const g=await F.getDoc(F.doc(FB.db,'guilds',S.guild));SOC.guild=g.exists()?{id:g.id,...g.data()}:null;const ms=await F.getDocs(F.collection(FB.db,'guilds',S.guild,'members'));SOC.members=ms.docs.map(d=>d.data())}catch(e){b.innerHTML='<div class="note">Can\'t reach the raid right now.</div>';return}
+  const wk=weekId(),rref=F.doc(FB.db,'guilds',S.guild,'raids','w'+wk);
+  try{let r=await F.getDoc(rref);if(!r.exists()){const lv=raidLevel(SOC.members),n=Math.max(1,SOC.members.length);await F.setDoc(rref,{name:RAIDN[wk%RAIDN.length],lv,hp:Math.round(mHP(lv)*45*n),members:n,created:Date.now()});r=await F.getDoc(rref)}SOC.raid={id:r.id,...r.data()}}catch(e){b.innerHTML='<div class="note">Can\'t start the raid ('+esc((e&&e.code)||'error')+')</div>';return}
+  SOC.unsub.push(F.onSnapshot(F.collection(FB.db,'guilds',S.guild,'raids','w'+wk,'hits'),sn=>{SOC.hits=sn.docs.map(d=>d.data());renderRaid()},()=>{}));renderRaid()}
+function renderRaid(){const b=SB(),r=SOC.raid;if(!b||!r||S.tab!=='social'||S.socTab!=='raid')return;
+  const hits=(SOC.hits||[]).sort((a,c)=>c.dmg-a.dmg),tot=hits.reduce((a,h)=>a+(h.dmg||0),0),left=Math.max(0,r.hp-tot),dead=left<=0,me=hits.find(h=>h.uid===fbUser.uid),ul=usesLeft('raidAtt',RAID_PER_DAY),claimed=(S.raidClaim||{})[r.id+S.guild];
+  b.innerHTML=`<div class="card" style="background:linear-gradient(135deg,#2a1420,var(--panel))"><div class="note" style="letter-spacing:1.5px">THIS WEEK'S RAID BOSS · LEVEL ${r.lv}</div><h3 style="margin:4px 0 10px;font-size:20px;color:#ffb070">${esc(r.name)}</h3>
+    <div style="height:16px;background:#120f18;border-radius:8px;overflow:hidden;border:1px solid var(--line)"><div style="height:100%;width:${Math.max(0,left/r.hp*100)}%;background:linear-gradient(90deg,#b8323a,#ff6b5a)"></div></div>
+    <div class="note" style="margin-top:4px">${dead?'<b style="color:#5dd68c">Defeated!</b>':`${fmtN(left)} / ${fmtN(r.hp)} health left`} · resets every week</div>
+    ${dead?(me&&me.dmg>0?(claimed?'<div class="note" style="margin-top:10px">You claimed your reward. A new boss arrives next week.</div>':`<button class="btn" id="rClaim" style="margin-top:10px">Claim raid reward</button>`):'<div class="note" style="margin-top:10px">You didn\'t hit this boss, so there\'s no reward this time.</div>'):
+      `<button class="btn" id="rAtk" style="margin-top:10px" ${ul?'':'disabled'}>Attack (${ul}/${RAID_PER_DAY} left today)</button><div class="note" style="margin-top:6px">Your runner fights for up to 30 seconds with your current gear. Every member's damage adds up, and everyone who hits it shares the loot.</div>`}</div>
+  <div class="card"><h3>Damage dealt</h3>${hits.length?hits.map((h,i)=>`<div class="row"><span style="text-align:left;color:${h.uid===fbUser.uid?'var(--accent)':'var(--ink)'}">${i+1}. ${esc(h.name)}</span><span>${fmtN(h.dmg)} · ${h.n||1} hit${(h.n||1)===1?'':'s'}</span></div>`).join(''):'<div class="note">Nobody has attacked yet.</div>'}</div>`;
+  const a=$('#rAtk');if(a)a.onclick=raidAttack;const c=$('#rClaim');if(c)c.onclick=()=>raidClaim(me,tot)}
+const fmtN=n=>n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e4?Math.round(n/1e3)+'k':String(Math.round(n));
+function raidFightResult(lv){const p=gearParts(S.eq,lv),raw=mDMG(lv)*1.5,surv=Math.min(30,p.ehp/(raw*.3)),dps=p.st.dps*(.9+Math.random()*.2);return{dmg:Math.round(dps*surv),surv,dps}}
+async function raidAttack(){if(!usesLeft('raidAtt',RAID_PER_DAY))return;if(S.idle){toast('Your runner is out on an expedition');return}const r=SOC.raid,F=FB.F,res=raidFightResult(r.lv);useOne('raidAtt');
+  const ref=F.doc(FB.db,'guilds',S.guild,'raids',r.id,'hits',fbUser.uid),cur=(SOC.hits||[]).find(h=>h.uid===fbUser.uid);
+  const bl=Math.max(0,(SOC.raid.hp-(SOC.hits||[]).reduce((x,h)=>x+(h.dmg||0),0))/SOC.raid.hp);fightAnim(myName(),r.name,res.surv>=30?.3+.5*Math.random():0,Math.max(0,bl-res.dmg/r.hp),res.surv>=30,`${fmtN(res.dmg)} damage in ${res.surv.toFixed(1)}s`,async()=>{
+    try{await F.setDoc(ref,{uid:fbUser.uid,name:myName(),dmg:(cur?cur.dmg:0)+res.dmg,n:(cur?cur.n||1:0)+1,at:Date.now()})}catch(e){toast('Hit not recorded ('+((e&&e.code)||'error')+')')}
+    toast(res.surv>=30?`Survived! Dealt ${fmtN(res.dmg)} damage`:`Knocked out after ${res.surv.toFixed(1)}s, dealt ${fmtN(res.dmg)}`)})}
+function raidClaim(me,tot){const r=SOC.raid,share=Math.min(1,me.dmg/Math.max(1,tot)),lv=r.lv,R=Math.random;S.raidClaim=S.raidClaim||{};if(S.raidClaim[r.id+S.guild])return;
+  const pool=['chaos','chaos','divine','ascend','void','crown'],cur={};for(let i=0;i<3+Math.floor(share*10)+Math.floor(lv/10);i++){const k=pool[Math.floor(R()*pool.length)];cur[k]=(cur[k]||0)+1}
+  let it=genItem(R,lv+5,1.5);let g=0;while(it.rarity<2&&g++<20)it=genItem(R,lv+5,1.5);const items=[it];if(share>=.15&&R()<.35+share)items.push(mkUnique(UQK[Math.floor(R()*UQK.length)],R,lv+3));
+  const mats={crystal:Math.round(10+lv*(.5+share)),starmetal:Math.round(2+lv/6)};
+  for(const k in cur)S.cur[k]=(S.cur[k]||0)+cur[k];for(const k in mats)S.mats[k]=(S.mats[k]||0)+mats[k];for(const x of items)S.inv.push(x);S.raidClaim[r.id+S.guild]=1;persist();
+  modal('Raid reward!',`You did ${Math.round(share*100)}% of the damage.<br><br>${items.map(x=>`<div class="nm r${x.rarity}" style="font-weight:700">${esc(itemName(x))}</div>`).join('')}<div style="margin-top:8px">${Object.entries(cur).map(([k,v])=>`<span class="chip">${v} ${CUR[k].n}</span>`).join(' ')} ${Object.entries(mats).map(([k,v])=>chip(k,v)).join(' ')}</div>`,[{label:'Nice!',fn:()=>render()}])}
+// ---- arena
+function arenaStats(){const st=computeStats(S.eq);return{dps:st.dps,life:st.life,armour:st.armour,res:{fire:st.res.fire,cold:st.res.cold,poison:st.res.poison},dodge:st.dodge,aps:st.aps,loh:st.lifeOnHit,regen:st.regen,wclass:st.wclass}}
+async function pushArena(){if(!(FB&&fbUser))return;const F=FB.F;try{await F.setDoc(F.doc(FB.db,'arena',fbUser.uid),{uid:fbUser.uid,name:myName(),rating:Math.round(S.rating||1000),best:S.best||0,lvl:S.lvl||1,stats:arenaStats(),wins:S.arenaW||0,losses:S.arenaL||0,at:Date.now()})}catch(e){}}
+function duel(A,B,seed){// returns {win, aLeft, bLeft, t}
+  const r=mulberry32(seed),eff=(X,Y)=>{const hit=X.dps/Math.max(.3,X.aps),dr=Math.min(.8,Y.armour/(Y.armour+5*hit+1)),avgRes=(Y.res.fire+Y.res.cold+Y.res.poison)/300;return X.dps*(.5*(1-dr)+.5*(1-avgRes))*(1-Y.dodge/250)};
+  let a=A.life,b=B.life;const ea=eff(A,B),eb=eff(B,A),sa=(A.loh||0)*A.aps+(A.regen||0),sb=(B.loh||0)*B.aps+(B.regen||0);let t=0;
+  while(a>0&&b>0&&t<90){const dt=.25;b-=ea*dt*(.75+r()*.5);a-=eb*dt*(.75+r()*.5);a=Math.min(A.life,a+sa*dt);b=Math.min(B.life,b+sb*dt);t+=dt}
+  const win=b<=0&&a>0?true:a<=0&&b>0?false:(a/A.life>=b/B.life);return{win,aLeft:Math.max(0,a/A.life),bLeft:Math.max(0,b/B.life),t}}
+async function arenaView(){const F=FB.F;S.rating=S.rating||1000;await pushArena();
+  try{const sn=await F.getDocs(F.query(F.collection(FB.db,'arena'),F.orderBy('rating','desc'),F.limit(50)));SOC.arena=sn.docs.map(d=>d.data())}catch(e){SOC.arena=[]}
+  renderArena()}
+function renderArena(){const b=SB();if(!b||S.tab!=='social'||S.socTab!=='arena')return;const ul=usesLeft('arenaAtt',ARENA_PER_DAY),me=arenaStats(),list=SOC.arena||[];
+  const opps=list.filter(o=>o.uid!==fbUser.uid).sort((x,y)=>Math.abs(x.rating-S.rating)-Math.abs(y.rating-S.rating)).slice(0,6);
+  b.innerHTML=`<div class="card" style="display:flex;justify-content:space-between;align-items:center"><div><div class="note" style="letter-spacing:1.5px">YOUR RATING</div><div style="font-size:34px;font-weight:900;color:#ffe2b0">${Math.round(S.rating)}</div><div class="note">${S.arenaW||0} wins · ${S.arenaL||0} losses</div></div><div style="text-align:right"><div class="note">Fights today</div><b>${ul}/${ARENA_PER_DAY}</b><div class="note" style="margin-top:4px">DPS ${Math.round(me.dps)} · Life ${me.life}</div></div></div>
+  <div class="card"><h3>Challenge</h3><div class="note" style="margin-bottom:8px">Your runner fights another player's build using their real gear. Wins earn rating and a little currency. Your own build defends while you're away.</div>${opps.length?opps.map(o=>`<div class="row" style="align-items:center"><div><b>${esc(o.name)}</b><div class="note">Rating ${Math.round(o.rating)} · DPS ${Math.round(o.stats.dps)} · Life ${o.stats.life}</div></div><button class="btn small" data-duel="${esc(o.uid)}" style="width:auto" ${ul?'':'disabled'}>Fight</button></div>`).join(''):'<div class="note">No opponents yet. Get a friend to open the Arena!</div>'}</div>
+  <div class="card"><h3>Ladder</h3>${list.slice(0,20).map((o,i)=>`<div class="row"><span style="text-align:left;color:${o.uid===fbUser.uid?'var(--accent)':'var(--ink)'}">${i+1}. ${esc(o.name)}</span><span>${Math.round(o.rating)} · ${o.wins||0}W</span></div>`).join('')||'<div class="note">Empty.</div>'}</div>`;
+  document.querySelectorAll('[data-duel]').forEach(x=>x.onclick=()=>fight(list.find(o=>o.uid===x.dataset.duel)))}
+function fight(o){if(!o||!usesLeft('arenaAtt',ARENA_PER_DAY))return;useOne('arenaAtt');const me=arenaStats(),res=duel(me,o.stats,(Date.now()&0xffffff));
+  const exp=1/(1+Math.pow(10,(o.rating-S.rating)/400)),d=Math.round(32*((res.win?1:0)-exp));
+  fightAnim(myName(),o.name,res.aLeft,res.bLeft,res.win,`${res.win?'Victory':'Defeat'} in ${res.t.toFixed(1)}s · rating ${d>=0?'+':''}${d}`,async()=>{
+    S.rating=Math.max(100,(S.rating||1000)+d);if(res.win){S.arenaW=(S.arenaW||0)+1;const k=['chaos','crown','ascend'][Math.floor(Math.random()*3)];S.cur[k]=(S.cur[k]||0)+1;S.mats.crystal=(S.mats.crystal||0)+5;toast(`Won! +${d} rating, +1 ${CUR[k].n}, +5 Crystal`)}else{S.arenaL=(S.arenaL||0)+1;toast(`Lost. ${d} rating`)}
+    persist();await pushArena();arenaView()},true)}
+// ---- shared fight animation
+function fightAnim(a,b,aEnd,bEnd,won,line,done,pvp){modal(pvp?'Arena fight':'Raid attack',`<div style="display:flex;justify-content:space-between;font-weight:700;margin-bottom:6px"><span style="color:var(--accent)">${esc(a)}</span><span style="color:#ff8a7a">${esc(b)}</span></div>
+  <div style="display:flex;gap:10px"><div style="flex:1;height:12px;background:#120f18;border-radius:6px;overflow:hidden"><div id="fA" style="height:100%;width:100%;background:#5dd68c;transition:width 2.4s ease-in"></div></div><div style="flex:1;height:12px;background:#120f18;border-radius:6px;overflow:hidden"><div id="fB" style="height:100%;width:100%;background:#ff6b5a;transition:width 2.4s ease-in"></div></div></div>
+  <div id="fL" class="note" style="margin-top:10px;min-height:20px;text-align:center">Fighting…</div>`,[{label:'…',cls:'ghost',disabled:true}]);
+  const btn=document.querySelector('#mBtns .btn');
+  setTimeout(()=>{const A=$('#fA'),B=$('#fB');if(A)A.style.width=Math.round(aEnd*100)+'%';if(B)B.style.width=Math.round(bEnd*100)+'%'},60);
+  setTimeout(()=>{const L=$('#fL');if(L)L.innerHTML=`<b style="color:${won?'#5dd68c':'#ff9a7a'}">${line}</b>`;if(btn){btn.disabled=false;btn.textContent='OK';btn.onclick=()=>{$('#modal').classList.add('hidden');paused=false;done&&done()}}},2600)}
 
 updTabDots();
 window.__ds={idleRot,idleSet,localStats,empIntro,abyssMods,salv:salvageMats,Sim,computeStats,genItem,weekMods,mkUnique,mkMap,get S(){return S},get sim(){return sim},rollMod,simIdleRun,get pend(){return idlePending}};setTab(S.tab||'run');resize();initCloud();requestAnimationFrame(frame);
