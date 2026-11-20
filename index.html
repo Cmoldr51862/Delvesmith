@@ -2349,7 +2349,7 @@ function draw(){
   if(s.set.retreat){ctx.fillStyle='#fff';ctx.fillRect(16+150*s.set.retreat/100,14,2,16)}
   ctx.fillStyle='#fff';ctx.font='bold 11px system-ui,sans-serif';ctx.fillText(`${Math.ceil(s.life)}/${mx}`,172,26);
   const dps=s.hits.reduce((a,h)=>a+h.d,0)/4;
-  ctx.font='12px system-ui,sans-serif';ctx.fillStyle='#d6cde2';ctx.fillText(`${bname(s.floor)} · ${fmtT(s.t)} · rooms ${Math.min(L.rv||0,L.order.length)}/${L.order.length}`,16,44);
+  ctx.font='12px system-ui,sans-serif';ctx.fillStyle='#d6cde2';ctx.fillText(`${bname(s.floor)} · ${fmtT(s.t)} · rooms visited ${L.rv||0}`,16,44);
   {ctx.textAlign='right';ctx.fillStyle='#9a90a8';ctx.font='bold 9px system-ui,sans-serif';ctx.fillText('DEPTH',W-18,22);ctx.fillStyle='#ffe2b0';ctx.font='900 26px system-ui,sans-serif';ctx.fillText(String(s.floor),W-18,47);const dg=danger(s.floor);ctx.font='bold 10px system-ui,sans-serif';ctx.fillStyle=dg<3?'#7ee36b':dg<15?'#ffd36a':dg<80?'#ff9a4a':'#ff5f5f';ctx.fillText('Danger ×'+dg,W-18,61);ctx.textAlign='left';ctx.font='12px system-ui,sans-serif'}
   ctx.fillStyle=s.units>=s.st.bag?'#ff6b6b':'#efe8dc';ctx.fillText(`Bag ${s.units}/${s.st.bag}`,16,62);
   ctx.fillStyle='#ffd84a';ctx.fillText(`DPS ${Math.round(dps)}`,92,62);ctx.fillStyle='#efe8dc';ctx.fillText(`Kills ${s.kills}`,160,62);
