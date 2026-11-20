@@ -325,6 +325,43 @@ const cycName=f=>{const c=cycOf(f);return c?' '+(ROMAN[c]||('T'+(c+1))):''};
 const bsplit=f=>{const B=BIOMES[biomeOf(f)].split;if(!cycOf(f))return B;const A=BIOMES[4].split,o={};for(const k of TYPES)o[k]=(B[k]||0)*.5+(A[k]||0)*.5;return o};
 const bname=f=>BIOMES[biomeOf(f)].name+cycName(f);
 // Smooth difficulty: growth per floor starts steep and eases toward a steady rate (no biome jumps)
+// ================= SOUND =================
+const SFX=(()=>{let ac=null,master=null,nb=null;const last={},q=[];
+  const on=()=>S&&S.set&&S.set.sound!==false,vol=()=>S&&S.set&&S.set.vol!=null?S.set.vol:.6;
+  function ctx(){if(!ac){const A=window.AudioContext||window.webkitAudioContext;if(!A)return null;ac=new A();master=ac.createGain();master.connect(ac.destination);
+    nb=ac.createBuffer(1,ac.sampleRate*.6,ac.sampleRate);const d=nb.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1}
+    if(ac.state==='suspended')ac.resume();return ac}
+  function env(g,t,a,v,dur){g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(v,t+a);g.gain.exponentialRampToValueAtTime(0.0001,t+dur)}
+  function tone(f,dur,type,v,f2,delay){const t=ac.currentTime+(delay||0),o=ac.createOscillator(),g=ac.createGain();o.type=type||'square';o.frequency.setValueAtTime(f,t);if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+dur);env(g,t,.005,v,dur);o.connect(g);g.connect(master);o.start(t);o.stop(t+dur+.02)}
+  function noise(dur,ft,ff,v,ff2,delay){const t=ac.currentTime+(delay||0),src=ac.createBufferSource(),f=ac.createBiquadFilter(),g=ac.createGain();src.buffer=nb;f.type=ft;f.frequency.setValueAtTime(ff,t);if(ff2)f.frequency.exponentialRampToValueAtTime(ff2,t+dur);env(g,t,.004,v,dur);src.connect(f);f.connect(g);g.connect(master);src.start(t);src.stop(t+dur+.02)}
+  const P={
+    hit:()=>{noise(.07,'lowpass',1400,.35,300);tone(150,.07,'square',.08,70)},
+    crit:()=>{noise(.09,'lowpass',2600,.4,400);tone(880,.08,'triangle',.12,1300)},
+    swing:()=>noise(.09,'bandpass',1800,.12,700),
+    arrow:()=>noise(.1,'highpass',2500,.18,5000),
+    bolt:()=>tone(700,.13,'sine',.12,320),
+    fire:()=>{noise(.25,'lowpass',900,.3,200);tone(220,.2,'sawtooth',.05,90)},
+    frost:()=>{tone(1400,.18,'sine',.08,700);noise(.15,'highpass',4000,.12)},
+    toxic:()=>{tone(180,.22,'triangle',.1,260);noise(.18,'bandpass',600,.12)},
+    boom:()=>{noise(.4,'lowpass',800,.5,120);tone(90,.3,'sine',.25,40)},
+    cast:()=>{tone(392,.08,'triangle',.1);tone(587,.1,'triangle',.1,null,.06);tone(784,.14,'triangle',.08,null,.12)},
+    kill:()=>tone(320,.13,'square',.06,110),
+    hurt:()=>{tone(200,.16,'sawtooth',.12,90);noise(.1,'lowpass',700,.15)},
+    mine:()=>{tone(1200,.05,'square',.05,900);noise(.06,'highpass',3000,.12)},
+    pickup:()=>{tone(880,.06,'sine',.08);tone(1320,.08,'sine',.07,null,.05)},
+    rare:()=>{tone(660,.1,'triangle',.12);tone(990,.16,'triangle',.12,null,.08)},
+    unique:()=>{[523,659,784,1047].forEach((f,i)=>tone(f,.22,'triangle',.13,null,i*.09));tone(1568,.4,'sine',.06,null,.36)},
+    chest:()=>{noise(.12,'lowpass',500,.25);[523,659,784].forEach((f,i)=>tone(f,.14,'square',.06,null,.08+i*.07))},
+    stairs:()=>[440,349,262,196].forEach((f,i)=>tone(f,.16,'triangle',.1,null,i*.1)),
+    boss:()=>{tone(70,.9,'sawtooth',.18,55);noise(.8,'lowpass',300,.2)},
+    trap:()=>{noise(.12,'highpass',1500,.25,600);tone(500,.08,'square',.06,200)},
+    death:()=>{tone(330,.9,'sawtooth',.16,55);noise(.6,'lowpass',500,.2,80)},
+    escape:()=>[523,659,784,1047].forEach((f,i)=>tone(f,.16,'triangle',.1,null,i*.08)),
+    click:()=>tone(1000,.03,'square',.04)};
+  const GAP={hit:.06,crit:.08,swing:.08,arrow:.07,bolt:.07,kill:.07,hurt:.12,mine:.08,pickup:.08,boom:.1,trap:.15,fire:.1,frost:.1,toxic:.1};
+  return{play(n){if(!on()||!P[n])return;const c=ctx();if(!c)return;const t=c.currentTime;if(last[n]!=null&&t-last[n]<(GAP[n]||.03))return;last[n]=t;master.gain.value=vol();try{P[n]()}catch(e){}},
+    unlock(){if(on())ctx()},q,flush(){let k=0;while(q.length&&k++<6)this.play(q.shift());q.length=0}}})();
+document.addEventListener('pointerdown',()=>SFX.unlock(),{passive:true});
 const DOTC={B:'#ff5a5a',P:'#8fe36b',F:'#ffa040',C:'#9fdcff'};
 const SKN={fireball:{fire:'Fireball',cold:'Frost Bolt',poison:'Plague Bolt'},nova:{fire:'Fire Nova',cold:'Frost Nova',poison:'Toxic Nova'}};
 const SKD={fireball:{cold:'An icy orb that bursts for 200% in an area. Frost hits slow enemies.',poison:'A toxic orb that bursts for 200% in an area. Poison hits stack up to 5 times.'},
@@ -858,9 +895,11 @@ class Sim{
   }
   logm(msg,c){this.lastLog=msg;this.log.push({t:this.t,f:this.floor,msg,c:c||''})}
   fx(x,y,txt,c){if(this.visual)this.L.texts.push({x,y,txt,c,life:1})}
+  sfx(n){if(this.visual&&this.sq)this.sq.push(n)}
   pfx(x,y,c,n,sp=120){if(!this.visual)return;for(let i=0;i<n;i++)this.L.parts.push({x,y,vx:(Math.random()-.5)*2*sp,vy:-Math.random()*sp*1.4+sp*.3,life:.3+Math.random()*.4,c})}
   nextFloor(){
-    this.floor++;const L=this.L=genFloor(this.rng,this.floor,this.set.mapMods&&this.floor===this.set.startFloor?this.set.mapMods:null,this.set.weekMods||null);
+    this.floor++;if(this.floor>(this.set.startFloor||1))this.sfx('stairs');const L=this.L=genFloor(this.rng,this.floor,this.set.mapMods&&this.floor===this.set.startFloor?this.set.mapMods:null,this.set.weekMods||null);
+    if(this.L.boss)this.sfx('boss');
     this.P={x:L.start.x,y:L.start.y,w:18,h:18,vx:0,vy:0,face:1,ang:0,atkCd:.3,swing:0,hurt:0,inv:0,stuckT:0,repath:0,path:null,goalKey:-1,walk:0};this.ri=0;this.arrived=false;this.exitMode=false;this.pullDecided=0;this.keepOn=false;this.noRetreat=false;this.swUsed=false;if(this.ev)this.ev=[];
     if(this.floor>1)this.life=Math.min(this.st.life,this.life+this.st.life*.25);
     this.state='advance';this.decided=false;this.calcEff();
@@ -872,7 +911,7 @@ class Sim{
     if(need&&this.units>=this.st.bag&&!(this.set.autoSwap&&this.swapFor(kind,v,x,y))){this.lostFull++;this.fx(x,y-12,'Bag full!','#ff6b6b');return}
     if(need)this.units++;
     if(kind==='mat'){this.bag[v]=(this.bag[v]||0)+1;this.fx(x,y,'+'+MATS[v].n,MATS[v].c)}
-    else{this.items.push(v);this.fx(x,y-10,itemName(v),RCOL[v.rarity]);if(v.rarity>0)this.logm(`Found ${itemName(v)} (${BASES[v.base].n}, ilvl ${v.ilvl})`,RCOL[v.rarity])}
+    else{this.items.push(v);this.sfx(v.rarity>=3?'unique':v.rarity>=2?'rare':'pickup');this.fx(x,y-10,itemName(v),RCOL[v.rarity]);if(v.rarity>0)this.logm(`Found ${itemName(v)} (${BASES[v.base].n}, ilvl ${v.ilvl})`,RCOL[v.rarity])}
   }
   lowest(){let b=null;for(const k in this.bag)if(this.bag[k]>0){const v=MATVAL[k]*(this.bag[k]%STACK||STACK);if(!b||v<b.v)b={kind:'mat',k,v}}this.items.forEach((it,i)=>{const v=itemVal(it);if(!b||v<b.v)b={kind:'item',i,v}});return b}
   swapFor(kind,v,x,y){const inc=kind==='mat'?MATVAL[v]*STACK/2:itemVal(v),lo=this.lowest();if(!lo||lo.v>=inc)return false;
@@ -913,7 +952,7 @@ class Sim{
   ring(x,y,r,c,dur){if(this.visual)this.L.rings.push({x,y,r,c,t:0,max:dur||.35})}
   aoe(x,y,r,mult,extra,c){r*=(1+(this.st.areaInc||0)/100)*(this.curSpec==='wide'?1.35:1);for(const e of this.near(r,x,y)){this.hitEnemy(e,mult);if(extra&&e.hp>0)extra(e);if(this.done)return}this.cleanup();this.ring(x,y,r,c||'#ffffff')}
   nearest(maxD,needLos){const c=this.pc();let b=null,bd=1e9;for(const e of this.L.enemies){if(e.hp<=0)continue;const d=Math.hypot(e.x+e.w/2-c.x,e.y+e.h/2-c.y);if(d<maxD&&d<bd&&(!needLos||los(this.L,c.x,c.y,e.x+e.w/2,e.y+e.h/2,4))){bd=d;b=e}}return b}
-  shoot(kind,ang,mult,aoe){const c=this.pc(),sp=kind==='arrow'?520:kind==='bolt'?430:360;this.L.pshots.push({kind,el:this.st.sEl,x:c.x+Math.cos(ang)*12,y:c.y+Math.sin(ang)*12,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,mult,aoe:aoe||0,life:1.2})}
+  shoot(kind,ang,mult,aoe){this.sfx(kind==='arrow'?'arrow':kind==='fireball'?({cold:'frost',poison:'toxic'}[this.st.sEl]||'fire'):'bolt');const c=this.pc(),sp=kind==='arrow'?520:kind==='bolt'?430:360;this.L.pshots.push({kind,el:this.st.sEl,x:c.x+Math.cos(ang)*12,y:c.y+Math.sin(ang)*12,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,mult,aoe:aoe||0,life:1.2})}
   specOf(id){const M=this.st.m||{};for(const [c] of SPECS[id]||[])if(M['sp_'+id+'_'+c])return c;return null}
   cast(id){
     if(this.done)return 'The run is over';
@@ -959,7 +998,7 @@ class Sim{
       case 'disengage':{t=this.nearest(3*TS,false);if(M.parting&&t){const a2=ang(t);for(const o of [-.15,0,.15])this.shoot('arrow',a2+o,.8)}const a=t?ang(t)+Math.PI:p.ang+Math.PI;p.dash={vx:Math.cos(a)*520,vy:Math.sin(a)*520,t:.28};this.buff.haste=Math.max(this.buff.haste||0,3);break}
     }
     if(id==='fireball'&&(this.st.u||{}).twinfire){const a0=p.ang;this.ev.push({at:this.t+.3,f:()=>{if(M.splitfire){for(const o of [-.28,0,.28])this.shoot('fireball',a0+o,1.2,50)}else this.shoot('fireball',a0,2,60)}})}
-    this.cds[id]=sk.cd;if((this.st.u||{}).echo&&this.rng()<.25){this.cds[id]=0;this.fx(c.x,p.y-34,'Echo!','#ff9a3a')}this.fx(c.x,p.y-22,skN(id,this.st.sEl)+'!','#ffd36a');this.casts=(this.casts||0)+1;
+    this.cds[id]=sk.cd;if((this.st.u||{}).echo&&this.rng()<.25){this.cds[id]=0;this.fx(c.x,p.y-34,'Echo!','#ff9a3a')}this.fx(c.x,p.y-22,skN(id,this.st.sEl)+'!','#ffd36a');this.sfx('cast');this.casts=(this.casts||0)+1;
     return '';
   }
   fightEval(eng,ehp,inc,net){
@@ -1045,7 +1084,7 @@ class Sim{
         break}
     }
   }
-  gainMap(m){(this.maps=this.maps||[]).push(m);this.logm(`Found a Delve Map (Floor ${m.floor})`,'#c08aff');this.fx(this.P.x+9,this.P.y-40,'Delve Map!','#c08aff')}
+  gainMap(m){(this.maps=this.maps||[]).push(m);this.logm(`Found a Delve Map (Floor ${m.floor})`,'#c08aff');this.sfx('rare');this.fx(this.P.x+9,this.P.y-40,'Delve Map!','#c08aff')}
   hurt(raw,src,split,melee){
     if(melee&&this.buff.smoke>0){this.fx(this.P.x+9,this.P.y-10,'Miss','#cfc6dc');return}
     if(melee&&(this.st.u||{}).phantom&&this.rng()*100<(this.st.dodge||0)/2){this.fx(this.P.x+9,this.P.y-10,'Evaded','#8fd3ff');return}
@@ -1056,7 +1095,7 @@ class Sim{
       this.taken[k]+=tk;tot+=tk;parts.push([k,tk])}
     if(/trap|vent|Spikes|puddle|rocks/i.test(src))this.trapTaken=(this.trapTaken||0)+tot;
     parts.sort((a,b)=>b[1]-a[1]);
-    this.life-=tot;this.P.hurt=.18;
+    this.life-=tot;this.P.hurt=.18;if(tot>0)this.sfx('hurt');
     if(melee&&typeof melee==='object'&&melee.hp>0&&this.st.m){if(this.buff.guard>0&&this.st.m.riposte){this.hitEnemy(melee,1);this.fx(this.P.x+9,this.P.y-30,'Riposte!','#ffd36a')}if(melee.hp>0&&this.buff.iron>0&&this.st.m.thorns)this.hitEnemy(melee,.6)}
     if(this.st.secondWind&&!this.swUsed&&this.life>0&&this.life<this.st.life*.25){this.swUsed=true;this.life+=this.st.life*.3;this.fx(this.P.x+9,this.P.y-26,'Second Wind!','#7ee36b');this.logm('Second Wind!','#7ee36b')}
     this.fx(this.P.x+this.P.w/2,this.P.y-4,'-'+Math.round(tot),TCOL[parts[0][0]]);
@@ -1080,9 +1119,9 @@ class Sim{
     if(U.prism&&crit&&!(this.prismCd>this.t)){this.prismCd=this.t+.25;let o=null,od=1e9;for(const q of this.L.enemies){if(q===e||q.hp<=0)continue;const dd=Math.hypot(q.x-e.x,q.y-e.y);if(dd<4*TS&&dd<od){od=dd;o=q}}
       if(o){const sx=e.x+e.w/2,sy=e.y+e.h/2,a2=Math.atan2(o.y+o.h/2-sy,o.x+o.w/2-sx);this.L.pshots.push({kind:'bolt',x:sx,y:sy,vx:Math.cos(a2)*430,vy:Math.sin(a2)*430,mult:.5,aoe:0,life:1,skip:e})}}
     if(U.tremor&&!isSk&&!this.tickK&&this.rng()<.2){const ex2=e.x+e.w/2,ey2=e.y+e.h/2;this.ev.push({at:this.t+.05,f:()=>this.aoe(ex2,ey2,60,.8,null,'#d8c8a8')})}
-    const tk=this.tickK;this.fx(e.x+e.w/2+(tk?8:0),e.y-4-(tk?6:0),Math.round(tot)+(crit?'!':''),tk?DOTC[tk]:crit?'#ffd84a':'#ffffff');this.pfx(e.x+e.w/2,e.y+e.h/2,B.enemy,5);
+    const tk=this.tickK;if(!tk&&!quiet)this.sfx(crit?'crit':'hit');this.fx(e.x+e.w/2+(tk?8:0),e.y-4-(tk?6:0),Math.round(tot)+(crit?'!':''),tk?DOTC[tk]:crit?'#ffd84a':'#ffffff');this.pfx(e.x+e.w/2,e.y+e.h/2,B.enemy,5);
     if(e.hp<=0){
-      this.kills++;if(this.st.bloodlust){if(this.t>(this.bloodT||0))this.blood=0;this.blood=Math.min(5,(this.blood||0)+1);this.bloodT=this.t+4}this.killTimes.push(this.t-e.engT);const x=e.x+e.w/2,y=e.y;
+      this.kills++;this.sfx(e.boss?'boom':'kill');if(this.st.bloodlust){if(this.t>(this.bloodT||0))this.blood=0;this.blood=Math.min(5,(this.blood||0)+1);this.bloodT=this.t+4}this.killTimes.push(this.t-e.engT);const x=e.x+e.w/2,y=e.y;
       if(st.u&&st.u.gelheart)this.life=Math.min(st.life,this.life+st.life*.08);
       this.xp=(this.xp||0)+(e.boss?30:e.champ?5:e.type==='bat'?.6:1)*this.floor*(1+(this.L.lootQ||0)/200);
       if(this.L.modset&&this.L.modset.volatile&&!e.boss){this.pud=(this.pud||0)+1;this.L.puddles.push({x,y:e.y+e.h/2,r:48,warn:.7,w0:.7,life:0,tick:0,dmg:e.dmg,name:'Volatile explosion',blast:1,seen:this.roll(77,this.pud)*100<(this.st.dodge||0)})}
@@ -1110,7 +1149,7 @@ class Sim{
     if(s.descendHp&&hp<s.descendHp)return `HP ${Math.round(hp)}% is below your ${s.descendHp}% limit for going deeper`;
     return '';
   }
-  finish(o){if(this.done)return;this.done=true;this.outcome=o;if(o==='escaped')this.logm('Escaped the dungeon','#5dd68c')}
+  finish(o){if(this.done)return;this.done=true;this.outcome=o;this.sfx(o==='died'?'death':'escape');if(o==='escaped')this.logm('Escaped the dungeon','#5dd68c')}
   step(dt){
     if(this.done)return;
     const s=this,p=s.P,L=s.L,st=s.st,B=BIOMES[L.b];
@@ -1166,7 +1205,7 @@ class Sim{
     if((atkE||atkN)&&p.atkCd<=0&&!(p.channel>0)&&!p.dash){
       p.atkCd=1/(st.aps*(st.berserk&&s.life<st.life*.5?1.2:1)*(st.bloodlust&&s.t<(s.bloodT||0)?1+.05*(s.blood||0):1));p.swing=p.swingMax=wc.swing;p.alt=!p.alt;
       if(atkE){const dd=Math.hypot(atkE.x+atkE.w/2-pcx,atkE.y+atkE.h/2-pcy);if(wc.range&&dd>p.w/2+Math.max(atkE.w,atkE.h)/2+wc.reach+4){s.shoot(wc.range&&s.st.wclass==='bow'?'arrow':'bolt',p.ang,null);if(st.surge&&st.wclass==='staff'&&(s.surgeN=(s.surgeN||0)+1)%4===0){s.shoot('bolt',p.ang-.25,null);s.shoot('bolt',p.ang+.25,null)}}else s.hitEnemy(atkE)}
-      else{atkN.hp--;atkN.hurt=.12;s.pfx(atkN.x+14,atkN.y+12,'#8d8076',6);
+      else{atkN.hp--;atkN.hurt=.12;s.sfx('mine');s.pfx(atkN.x+14,atkN.y+12,'#8d8076',6);
         if(atkN.hp<=0){s.pfx(atkN.x+14,atkN.y+12,B.ore,14,160);s.mats(B.oreMat(s.rng()),2,atkN.x+14,atkN.y)}}
       L.enemies=L.enemies.filter(e=>e.hp>0);L.nodes=L.nodes.filter(n=>n.hp>0);
       if(s.done)return;
@@ -1270,7 +1309,7 @@ class Sim{
     L.pshots=L.pshots.filter(q=>q.life>0);
     if(s.visual){for(const r of L.rings)r.t+=dt;L.rings=L.rings.filter(r=>r.t<r.max)}
     for(const c of L.chests)if(!c.open&&overlap(p,c)){
-      c.open=true;const x=c.x+13,y=c.y;s.fx(x,y-14,'Chest!','#ffd84a');s.pfx(x,y,'#e0b040',14);
+      c.open=true;const x=c.x+13,y=c.y;s.fx(x,y-14,'Chest!','#ffd84a');s.sfx('chest');s.pfx(x,y,'#e0b040',14);
       const n=3+Math.floor(s.rng()*3);for(let i=0;i<n;i++)s.mats(s.rng()<.55?B.oreMat(s.rng()):B.mobMat(s.rng()),1,x,y);
       if(s.rng()<(st.treasure?.27:.18)||c.warden)s.addLoot('item',genItem(s.rng,s.floor,c.warden?.7:.3,s.L.wk),x,y);if(c.warden){s.addLoot('mat','starmetal',x,y);s.logm('Opened the Warden\'s chest!','#ffd36a')}
       if(s.floor>=3&&s.rng()<.3)s.addLoot('mat','starmetal',x,y);
@@ -1599,6 +1638,9 @@ function viewRun(){
     <div class="btnrow" style="margin-top:10px"><button class="btn small" id="fileBtn">Save backup file</button><button class="btn small ghost" id="loadFileBtn">Load backup file</button></div>
     <div class="btnrow" style="margin-top:8px"><button class="btn small ghost" id="snapBtn">Restore points</button><button class="btn small ghost" id="expBtn">Copy code</button><button class="btn small ghost" id="impBtn">Paste code</button></div>
     <div class="note" style="margin-top:8px">Progress saves to two separate places in this browser, plus automatic restore points. A backup file is your safety net if the browser's data gets cleared or you switch devices. Keep it in Files, Google Drive or an email to yourself.</div></div>`;
+  h+=`<div class="card"><h3>Sound</h3><div class="row"><b>Sound effects</b><span><button class="btn small ${S.set.sound===false?'ghost':''}" id="sndTgl">${S.set.sound===false?'Off':'On'}</button></span></div>
+    <div class="row"><b>Volume</b><span style="flex:1;max-width:180px"><input type="range" id="sndVol" min="0" max="100" value="${Math.round((S.set.vol!=null?S.set.vol:.6)*100)}" style="width:100%;accent-color:var(--accent)"></span></div>
+    <div class="note">Sounds play while you watch a run. On iPhone, the ring/silent switch has to be on ring to hear them.</div></div>`;
   h+=`<div class="card"><details><summary>How it works</summary><ul style="padding-left:18px">
     <li>Your runner plays the dungeon by itself: it fights, mines ore, opens chests and picks up loot.</li>
     <li><b>Retreat rules</b> decide when it turns back or takes the exit. Greedy settings pay more and fail harder.</li>
@@ -1629,6 +1671,7 @@ function viewRun(){
   const wb=$('#watchBtn');if(wb)wb.onclick=startWatch;
   const rb=$('#recallBtn');if(rb)rb.onclick=()=>modal('Recall the runner?','You keep the loot from every finished run. Whatever it is carrying in the current run is lost.',[{label:'Recall now',cls:'danger',fn:()=>{S.idle.finished=true;S.idle.recalled=true;persist();collectIdle()}},{label:'Keep going',cls:'ghost'}]);
   wireRunExtras();
+  if($('#sndTgl')){$('#sndTgl').onclick=()=>{S.set.sound=S.set.sound===false;persist();if(S.set.sound)SFX.play('rare');render()};$('#sndVol').oninput=e=>{S.set.vol=e.target.value/100};$('#sndVol').onchange=()=>{persist();SFX.play('chest')}}
   if($('#expBtn')){$('#expBtn').onclick=exportSave;$('#impBtn').onclick=importSave;$('#fileBtn').onclick=backupFile;bindAcct();$('#loadFileBtn').onclick=loadFile;$('#snapBtn').onclick=showSnaps;const nb=$('#nudgeBtn');if(nb)nb.onclick=backupFile;
   }
   if($('#resetBtn'))$('#resetBtn').onclick=()=>modal('Reset all progress?','This wipes your materials, currency, gear and records. A restore point of your current progress is kept on this device.',[{label:'Wipe everything',cls:'danger',fn:()=>{snapNow();setTimeout(()=>{defSave();myWriteT=0;try{localStorage.setItem(KEY+'_t','0')}catch(e){}persist();setTab('run')},50)}},{label:'Cancel',cls:'ghost'}]);
@@ -2460,7 +2503,7 @@ function frame(t){
     if(sim.done&&!watchWait){watchWait=true;idleCatchUp().then(()=>{watchWait=false;if(mode!=='watch')return;
       if(!S.idle||S.idle.finished){endWatch();toast('Expedition finished. Collect your loot!')}else if(S.idle.runs.length>watchI)beginWatchRun()})}
   }
-  if(mode==='live'||mode==='ending'||mode==='watch'){if(sim)draw();updLog()}
+  if(mode==='live'||mode==='ending'||mode==='watch'){if(sim){if(!sim.sq)sim.sq=SFX.q;if(mode==='watch'&&speed===0)SFX.q.length=0;SFX.flush();draw()}updLog()}
   requestAnimationFrame(frame);
 }
 if(S.idle&&!S.idle.v){try{applyResult(S.idle.res,S.idle.charm)}catch(e){}S.idle=null;persist()}
