@@ -523,7 +523,7 @@ const CUR={
   chaos:{n:'Chaos Shard',d:'Rare: remove a random modifier, then add a new one',cost:{silk:8,gel:10,glowcap:4}},
   void:{n:'Void Orb',d:'Remove a random modifier',cost:{crystal:8,silk:5}},
   scour:{n:'Scouring Sand',d:'Strip all modifiers, back to Normal. Also lets the item take an essence again',cost:{copper:4,gel:3}},
-  temper:{n:'Tempering Orb',d:'Upgrade a random modifier by one tier and reroll it in the new tier. Can\'t create the best tier for the item level. Max 2 per item (Scouring Sand resets this). Seals steer it like Chaos and Void',cost:{copper:80,gel:80,glowcap:70,silk:70,starmetal:4},nodisc:1},
+  temper:{n:'Tempering Orb',d:'Upgrade a random modifier by one tier and reroll it in the new tier. Can\'t create the best tier for the item level. Max 2 per item (Scouring Sand resets this). Seals steer it like Chaos and Void',cost:{copper:100,gel:100,glowcap:100,silk:100,starmetal:4},nodisc:1},
   divine:{n:'Divine Dust',d:'Reroll every modifier value within its tier',cost:{starmetal:3,crystal:6}},
   sealP:{n:'Prefix Seal',d:'Omen: your next Chaos, Void or Tempering Orb cannot touch prefixes',cost:{starmetal:2,silk:8},omen:1},
   sealS:{n:'Suffix Seal',d:'Omen: your next Chaos, Void or Tempering Orb cannot touch suffixes',cost:{starmetal:2,silk:8},omen:1},
@@ -1355,6 +1355,7 @@ function holdBtn(el,ms,fn){
   ['pointerup','pointercancel','pointerleave','lostpointercapture'].forEach(ev=>el.addEventListener(ev,()=>{if(t0&&!done)toast('Keep holding to confirm');reset()}));
   el.addEventListener('contextmenu',e=>e.preventDefault());
 }
+function addModalX(){const t=$('#mTitle');if(!t||t.querySelector('.mx'))return;const x=document.createElement('button');x.className='mx';x.textContent='✕';x.setAttribute('aria-label','Close');x.style.cssText='float:right;background:#2a2433;border:1px solid var(--line);color:var(--ink);border-radius:10px;width:36px;height:36px;font-size:18px;line-height:1;cursor:pointer;margin:-4px -4px 0 8px';x.onclick=()=>{$('#modal').classList.add('hidden');paused=false};t.prepend(x)}
 function modal(title,body,btns){
   $('#mTitle').textContent=title;$('#mBody').innerHTML=body;const mb=$('#mBtns');mb.innerHTML='';
   btns.forEach(b=>{const e=document.createElement('button');e.className='btn '+(b.cls||'');e.textContent=b.label;e.disabled=!!b.disabled;
@@ -1764,7 +1765,7 @@ function viewGear(){
   for(const u of [...picked])if(!S.inv.some(i=>i.uid===u))picked.delete(u);
   h+=`<div class="card" id="invCard"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">Inventory · ${S.inv.length}/${S.invCap}</h3>${S.inv.length?`<button class="btn small ghost" id="selBtn">${selMode?'Done':'Select'}</button>`:''}</div>${S.inv.length>1?`<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><input id="invQ" type="search" placeholder="Search: cold resistance, ring, rare…" value="${invQ.replace(/"/g,'&quot;')}" autocomplete="off" style="flex:1"><span id="invCount" class="note" style="white-space:nowrap"></span></div><select id="invSort" style="margin-bottom:10px">${Object.entries(SORTS).map(([k,v])=>`<option value="${k}" ${(S.invSort||'recent')===k?'selected':''}>Sort: ${v}</option>`).join('')}</select>`:''}`;
   if(selMode&&S.inv.length){const tot={};for(const it of S.inv)if(picked.has(it.uid)){const m=salvageMats(it);for(const k in m)tot[k]=(tot[k]||0)+m[k]}
-    h+=`<div class="chips" style="margin-bottom:8px"><button class="btn small ghost" data-pk="0">Normal</button><button class="btn small ghost" data-pk="1">Magic</button><button class="btn small ghost" data-pk="2">Rare</button><button class="btn small ghost" data-pk="all">All</button><button class="btn small ghost" data-pk="none">Clear</button></div>
+    h+=`<div class="chips" style="margin-bottom:8px">${[['0','Normal'],['1','Magic'],['2','Rare'],['all','All']].map(([k,n])=>{const g=pkGroup(k),on=g.length&&g.every(i=>picked.has(i.uid));return `<button class="btn small ${on?'':'ghost'}" data-pk="${k}" ${on?'style="box-shadow:0 0 0 2px var(--accent),0 0 12px rgba(224,164,88,.45)"':''}>${on?'✓ ':''}${n}</button>`}).join('')}<button class="btn small ghost" data-pk="none">Clear</button></div>
     <button class="btn danger" id="salvAll" ${picked.size?'':'disabled'}>Hold to salvage ${picked.size} item${picked.size===1?'':'s'}</button>
     ${picked.size?`<div class="note" style="margin:6px 0 4px">You'll get:</div>${matList(tot)}`:'<div class="note" style="margin:6px 0">Tap items to select them, or use the quick-select buttons.</div>'}<div style="height:10px"></div>`}
   h+=`${S.inv.length?sortedInv().map(it=>selMode?pickRow(it):slotRow(it)).join(''):'<div class="note">Empty. Items drop in the dungeon.</div>'}</div>`;
@@ -1776,7 +1777,7 @@ function viewGear(){
   const so=$('#invSort');if(so)so.onchange=e=>{S.invSort=e.target.value;persist();keep()};
   const iq=$('#invQ');if(iq)iq.oninput=e=>{invQ=e.target.value;applyInvFilter()};applyInvFilter();
   document.querySelectorAll('[data-pick]').forEach(e=>e.onclick=()=>{const u=+e.dataset.pick;picked.has(u)?picked.delete(u):picked.add(u);keep()});
-  document.querySelectorAll('[data-pk]').forEach(b=>b.onclick=()=>{const k=b.dataset.pk;if(k==='none')picked.clear();else if(k==='all')S.inv.filter(i=>!i.fav&&invMatch(i)).forEach(i=>picked.add(i.uid));else S.inv.filter(i=>i.rarity===+k&&!i.fav&&invMatch(i)).forEach(i=>picked.add(i.uid));keep()});
+  document.querySelectorAll('[data-pk]').forEach(b=>b.onclick=()=>{const k=b.dataset.pk;if(k==='none'){picked.clear();keep();return}const g=pkGroup(k),on=g.length&&g.every(i=>picked.has(i.uid));g.forEach(i=>on?picked.delete(i.uid):picked.add(i.uid));keep()});
   const sa=$('#salvAll');if(sa)holdBtn(sa,1000,()=>{for(const i of S.inv)if(i.fav)picked.delete(i.uid);const its=S.inv.filter(i=>picked.has(i.uid)),rares=its.filter(i=>i.rarity===2);
     const go=()=>{const tot={};for(const it of its){const m=salvageMats(it);for(const k in m){tot[k]=(tot[k]||0)+m[k];S.mats[k]=(S.mats[k]||0)+m[k]}}
       S.inv=S.inv.filter(i=>!picked.has(i.uid));picked.clear();selMode=false;persist();keep();toast(`Salvaged ${its.length} item${its.length===1?'':'s'}: `+Object.entries(tot).map(([k,v])=>`${v} ${MATS[k].n}`).join(', '))};
@@ -1784,6 +1785,7 @@ function viewGear(){
     else go()});
 }
 let selMode=false;const picked=new Set();
+function pkGroup(k){return S.inv.filter(i=>!i.fav&&invMatch(i)&&(k==='all'||i.rarity===+k))}
 function pickRow(it){if(it.fav)return `<div class="slotrow" style="opacity:.45" data-iu="${it.uid}"><div style="display:flex;gap:10px;align-items:center"><span class="cb" style="color:#ffd36a">★</span><div><div class="sl">${SLOTN[it.slot]} · favorite, can't salvage</div><div class="nm r${it.rarity}">${itemName(it)}</div></div></div></div>`;const on=picked.has(it.uid);return `<div class="slotrow ${on?'picked':''}" data-pick="${it.uid}" data-iu="${it.uid}"><div style="display:flex;gap:10px;align-items:center"><span class="cb">${on?'✓':''}</span><div><div class="sl">${SLOTN[it.slot]}</div><div class="nm r${it.rarity}">${itemName(it)}</div><div class="meta">${it.rarity===2?BASES[it.base].n+' · ':''}ilvl ${it.ilvl} · ${it.mods.length} mods</div></div></div></div>`}
 function exportSave(){
   const code='DS2:'+b64e(JSON.stringify(S));
@@ -1833,7 +1835,9 @@ function itemModal(it){
   let cmp='';
   let diff='';if(!eq){const ks=it.slot==='ring'?(S.eq.ring&&S.eq.ring2?['ring','ring2']:[S.eq.ring?'ring2':'ring']):[it.slot];diff=ks.map(k=>swapDiff(it,k)).join('')}
   if(!eq){const cur=(it.slot==='ring'?['ring','ring2']:[it.slot]).map(k=>S.eq[k]).filter(Boolean);if(cur.length)cmp=`<div class="note" style="margin:10px 0 6px">Currently equipped:</div>`+cur.map(c=>itemHTML(c)).join('<div style="height:6px"></div>')}
+  if(USE_FB&&fbUser&&!eq&&!lock)btns.push({label:it.fav?'Sell on market (remove favorite first)':'🏷 Sell on market',cls:'ghost',disabled:!!it.fav,fn:()=>setTimeout(()=>priceForm(it),50)});
   btns.push({label:'Close',cls:'ghost'});
+  setTimeout(addModalX,0);
   modal((it.fav?'★ ':'')+(eq?'Equipped item':'Item'),diff+itemHTML(it)+cmp+(it.fav&&!eq?'<div class="note" style="margin-top:8px;color:#ffd36a">Favorited, so it can\'t be salvaged. Remove the favorite first if you want to scrap it.</div>':'')+(S.idle&&!eq?'<div class="note warn" style="margin-top:8px">Gear swaps are locked during an idle run.</div>':''),btns);
 }
 
