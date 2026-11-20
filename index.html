@@ -453,10 +453,10 @@ const CUR={
   divine:{n:'Divine Dust',d:'Reroll every modifier value within its tier',cost:{starmetal:3,crystal:6}},
   sealP:{n:'Prefix Seal',d:'Omen: your next Chaos or Void cannot remove prefixes',cost:{starmetal:2,silk:8},omen:1},
   sealS:{n:'Suffix Seal',d:'Omen: your next Chaos or Void cannot remove suffixes',cost:{starmetal:2,silk:8},omen:1},
-  essVigor:{n:'Essence of Vigor',d:'Normal/Magic → Rare with a guaranteed high-tier Life mod (Physical damage on weapons)',cost:{gel:14,copper:10},ess:{weapon:'addPhys',other:'life'}},
-  essRot:{n:'Essence of Rot',d:'Normal/Magic → Rare with guaranteed Poison Resistance (Poison damage on weapons)',cost:{silk:12,glowcap:8},ess:{weapon:'addPoison',other:'poisonRes'}},
-  essFrost:{n:'Essence of Frost',d:'Normal/Magic → Rare with guaranteed Cold Resistance (Cold damage on weapons)',cost:{crystal:12,silk:4},ess:{weapon:'addCold',other:'coldRes'}},
-  essCinder:{n:'Essence of Cinders',d:'Normal/Magic → Rare with guaranteed Fire Resistance (Fire damage on weapons)',cost:{ember:12,crystal:4},ess:{weapon:'addFire',other:'fireRes'}}
+  essVigor:{n:'Essence of Vigor',d:'Adds one guaranteed high-tier Life mod (Physical damage on weapons). Keeps existing mods. One essence per item.',cost:{gel:14,copper:10},ess:{weapon:'addPhys',other:'life'}},
+  essRot:{n:'Essence of Rot',d:'Adds one guaranteed high-tier Poison Resistance mod (Poison damage on weapons). Keeps existing mods. One essence per item.',cost:{silk:12,glowcap:8},ess:{weapon:'addPoison',other:'poisonRes'}},
+  essFrost:{n:'Essence of Frost',d:'Adds one guaranteed high-tier Cold Resistance mod (Cold damage on weapons). Keeps existing mods. One essence per item.',cost:{crystal:12,silk:4},ess:{weapon:'addCold',other:'coldRes'}},
+  essCinder:{n:'Essence of Cinders',d:'Adds one guaranteed high-tier Fire Resistance mod (Fire damage on weapons). Keeps existing mods. One essence per item.',cost:{ember:12,crystal:4},ess:{weapon:'addFire',other:'fireRes'}}
 };
 const CKEYS=Object.keys(CUR);
 const CHARMS={
@@ -641,7 +641,7 @@ function genItem(rand,floor,boost,wk){
 }
 function tierLabel(m){if(m.u)return 'U';const n=AFF[m.a].t.length;return (isP(m)?'P':'S')+(n-m.t)}
 function itemHTML(it,newMods){
-  const b=BASES[it.base];let h=`<div class="item"><div class="iname r${it.rarity}">${itemName(it)}</div>${it.emp?`<div class="ibase" style="color:#ffb070">Empowered +${it.emp}: all stats +${it.emp*5}%</div>`:''}`;
+  const b=BASES[it.base];let h=`<div class="item"><div class="iname r${it.rarity}">${itemName(it)}</div>${it.emp?`<div class="ibase" style="color:#ffb070">Empowered +${it.emp}: all stats +${it.emp*5}%</div>`:''}${it.ess&&CUR[it.ess]?`<div class="ibase" style="color:#8fd3ff">${CUR[it.ess].n} used</div>`:''}`;
   if(it.rarity===2)h+=`<div class="ibase">${b.n}</div>`;
   h+=`<div class="ibase">${b.cls?WCLASS[b.cls].n+(WCLASS[b.cls].range?' (ranged)':''):SLOTN[it.slot]} · Item Level ${it.ilvl}</div><div class="ihr"></div>`;
   {const L=localStats(it),aug=(v,a)=>a?`<span class="r1"><b>${v}</b></span>`:v;
@@ -1435,7 +1435,7 @@ function viewGuide(){
     <li>Weapon damage, speed and crit modifiers change the weapon's own numbers, shown in blue. Armour modifiers do the same on armour.</li>
     <li>Salvage gear you don't need for materials. Use <b>Select</b> on the Gear tab to salvage many at once. Tap an item and choose <b>Favorite</b> to protect it: favorites (★) can never be salvaged.</li></ul>`);
   h+=sec('Crafting currency',`${CKEYS.map(k=>`<div class="row" style="display:block"><b>${CUR[k].n}</b><div class="note">${CUR[k].d}</div></div>`).join('')}
-    <p style="margin:8px 0 0"><b>A typical path:</b> Tinker (Normal to Magic), then Graft, then Crown (to Rare), then Ascension to fill it. Use Chaos or Void to reroll bad modifiers, and Seals to protect the good half. Essences make a Rare with one guaranteed modifier, which is great for resistances.</p>`);
+    <p style="margin:8px 0 0"><b>A typical path:</b> Tinker (Normal to Magic), then Graft, then Crown (to Rare), then Ascension to fill it. Use Chaos or Void to reroll bad modifiers, and Seals to protect the good half. An <b>Essence</b> adds one guaranteed high-tier modifier without touching the others (Normal becomes Magic, a full Magic becomes Rare), but each item can only ever take <b>one</b> essence, so pick it carefully.</p>`);
   h+=sec('Materials',`${MKEYS.map(k=>`<div class="row"><span style="text-align:left;color:${MATS[k].c}">${MATS[k].n}</span><span>${{copper:'Mines ore',gel:'Mines monsters',glowcap:'Fungal ore',silk:'Fungal monsters',crystal:'Crystal Depths',ember:'Magma Vents',starmetal:'Chests, Champions and bosses, floor 3+',voidshard:'The Abyss, floor 9+'}[k]}</span></div>`).join('')}`);
   h+=sec('Saving your progress',`<p style="margin:0">Progress saves automatically in this browser. Clearing browser data or switching devices can lose it, so use <b>Back up</b> on the Run tab to copy a code, and <b>Restore</b> to load it anywhere.</p>`);
   $('#view').innerHTML=h;
@@ -1501,7 +1501,7 @@ function viewRun(){
     <li><b>Retreat rules</b> decide when it turns back or takes the exit. Greedy settings pay more and fail harder.</li>
     <li>If the runner dies, you lose the whole bag unless a <b>charm</b> saves part of it.</li>
     <li>Gear drops with an <b>item level</b> equal to its floor. Higher item levels can roll higher-tier modifiers (T1 is best).</li>
-    <li><b>Refine</b> materials into crafting orbs and essences, then use them on gear in the <b>Craft</b> tab.</li>
+    <li><b>Refine</b> materials into crafting orbs and essences, then use them on gear in <b>Town → Crafting</b>.</li>
     <li>Each biome hits with a different damage type. Check the run report to see what's hurting you.</li></ul></details></div>
     <button class="btn ghost" id="resetBtn">Reset all progress</button>`;
   }
@@ -1664,7 +1664,9 @@ function swapDiff(it,k){const a=computeStats(S.eq),b=computeStats({...S.eq,[k]:i
   const ch=rows.filter(r=>Math.abs(r[2]-r[1])>=(r[3]?.05:.5)).map(([n,x,y,d,u])=>{const up=y>x;return `<div class="row"><b>${n}</b><span>${fmt(x,d)}${u||''} → <b style="color:${up?'#5dd68c':'#ff8a7a'}">${fmt(y,d)}${u||''}</b> <small style="color:${up?'#5dd68c':'#ff8a7a'}">${up?'▲':'▼'}${fmt(Math.abs(y-x),d)}</small></span></div>`});
   const sa=gearScore(S.eq,f),sb=gearScore({...S.eq,[k]:it},f),r=sb/sa;
   const v=r>1.03?['Upgrade','#5dd68c']:r<.97?['Downgrade','#ff8a7a']:['About even','#ffd36a'];
-  return `<div class="card" style="margin:0 0 10px;border-color:${v[1]}55"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b style="color:${v[1]};font-size:16px">${v[0]}</b><span class="note">if you equip this${k==='ring2'?' (ring 2)':''}</span></div>${ch.length?ch.join(''):'<div class="note">No change to your stats.</div>'}<div class="note" style="margin-top:6px">Overall rating uses the Balanced setting from Equip best (damage and survival at depth ${f}).</div></div>`}
+  let eqE='';const cur=S.eq[k];if(cur&&(cur.emp||0)!==(it.emp||0)){const cl=JSON.parse(JSON.stringify(it));cl.emp=cur.emp||0;const c2={...S.eq,[k]:cl},st2=computeStats(c2),r2=gearScore(c2,f)/sa,v2=r2>1.03?['better','#5dd68c']:r2<.97?['worse','#ff8a7a']:['about the same','#ffd36a'];
+    eqE=`<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line)"><div class="note" style="margin-bottom:4px">IF THIS WERE ALSO ${cur.emp?'+'+cur.emp:'UNEMPOWERED'} (same as your current one)</div><div class="row"><b>Verdict</b><b style="color:${v2[1]}">${v2[0][0].toUpperCase()+v2[0].slice(1)}</b></div><div class="row"><b>DPS</b><span>${fmt(a.dps,1)} → <b style="color:${st2.dps>=a.dps?'#5dd68c':'#ff8a7a'}">${fmt(st2.dps,1)}</b></span></div>${Math.abs(st2.life-a.life)>=1?`<div class="row"><b>Life</b><span>${a.life} → <b style="color:${st2.life>=a.life?'#5dd68c':'#ff8a7a'}">${st2.life}</b></span></div>`:''}<div class="note">Shows the item's real potential if you Empower it to match.</div></div>`}
+  return `<div class="card" style="margin:0 0 10px;border-color:${v[1]}55"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b style="color:${v[1]};font-size:16px">${v[0]}</b><span class="note">if you equip this${k==='ring2'?' (ring 2)':''}</span></div>${ch.length?ch.join(''):'<div class="note">No change to your stats.</div>'}<div class="note" style="margin-top:6px">Overall rating uses the Balanced setting from Equip best (damage and survival at depth ${f}).</div>${eqE}</div>`}
 function itemModal(it){
   const eq=isEquipped(it),lock=idleLocked(it),btns=[];
   const equipTo=k=>()=>{S.flags.equipped=1;const old=S.eq[k];S.inv=S.inv.filter(i=>i.uid!==it.uid);if(old)S.inv.push(old);S.eq[k]=it;persist();render()};
@@ -1718,7 +1720,7 @@ function itemPicker(items){const eqd=items.filter(isEquipped),inv=sortedInv().fi
   document.querySelectorAll('[data-pi]').forEach(e=>e.onclick=()=>{S.sel=+e.dataset.pi;$('#modal').classList.add('hidden');paused=false;persist();viewCraft()})}
 function canUse(k,it){
   const c=CUR[k];if(it.rarity===3)return k==='divine';
-  if(c.ess)return it.rarity<2;
+  if(c.ess)return essFits(it,c);
   switch(k){
     case 'tinker':return it.rarity===0;
     case 'graft':return it.rarity===1&&it.mods.length<2&&canAdd(it);
@@ -1731,6 +1733,8 @@ function canUse(k,it){
   }
   return false;
 }
+function essFits(it,c){if(it.ess||it.rarity>2)return false;const fa=it.slot==='weapon'?c.ess.weapon:c.ess.other,a=AFF[fa];if(!a||!a.slots.includes(it.slot)||it.mods.some(m=>m.a===fa)||a.t[0][0]>it.ilvl)return false;
+  const same=it.mods.filter(m=>isP(m)===!!a.p).length;return it.rarity===2?same<3:true}
 function removable(it){return it.mods.filter(m=>!(S.omen.sealP&&isP(m))&&!(S.omen.sealS&&!isP(m)))}
 function useCur(k,it){
   const c=CUR[k],R=Math.random;
@@ -1738,7 +1742,7 @@ function useCur(k,it){
   if(!canUse(k,it)||!(S.cur[k]>0))return;
   S.cur[k]--;S.flags.crafted=1;const before=new Set(it.mods);let msg='';
   const removeOne=()=>{const pool=removable(it);const m=pool[Math.floor(R()*pool.length)];it.mods=it.mods.filter(x=>x!==m);if(S.omen.sealP||S.omen.sealS){S.omen.sealP=0;S.omen.sealS=0;msg+='Seal consumed. '}return m};
-  if(c.ess){it.mods=[];it.rarity=2;it.name=rareName(R);const fa=it.slot==='weapon'?c.ess.weapon:c.ess.other;rollMod(it,R,fa,true);for(let i=0;i<3;i++)rollMod(it,R);msg=`${c.n} forged a Rare.`}
+  if(c.ess){const fa=it.slot==='weapon'?c.ess.weapon:c.ess.other,a=AFF[fa],same=it.mods.filter(m=>isP(m)===!!a.p).length;if(it.rarity===0)it.rarity=1;else if(it.rarity===1&&(same>=1||it.mods.length>=2)){it.rarity=2;it.name=rareName(R)}rollMod(it,R,fa,true);it.ess=k;msg=`${c.n} added a guaranteed modifier. This item can't take another essence.`}
   else switch(k){
     case 'tinker':it.rarity=1;rollMod(it,R);break;
     case 'graft':rollMod(it,R);break;
