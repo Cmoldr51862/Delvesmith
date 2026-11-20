@@ -449,14 +449,14 @@ const CUR={
   ascend:{n:'Ascension Orb',d:'Add a modifier to a Rare item (max 6)',cost:{crystal:12,glowcap:8,starmetal:1}},
   chaos:{n:'Chaos Shard',d:'Rare: remove a random modifier, then add a new one',cost:{silk:8,gel:10,glowcap:4}},
   void:{n:'Void Orb',d:'Remove a random modifier',cost:{crystal:8,silk:5}},
-  scour:{n:'Scouring Sand',d:'Strip all modifiers, back to Normal',cost:{copper:4,gel:3}},
+  scour:{n:'Scouring Sand',d:'Strip all modifiers, back to Normal. Also lets the item take an essence again',cost:{copper:4,gel:3}},
   divine:{n:'Divine Dust',d:'Reroll every modifier value within its tier',cost:{starmetal:3,crystal:6}},
   sealP:{n:'Prefix Seal',d:'Omen: your next Chaos or Void cannot remove prefixes',cost:{starmetal:2,silk:8},omen:1},
   sealS:{n:'Suffix Seal',d:'Omen: your next Chaos or Void cannot remove suffixes',cost:{starmetal:2,silk:8},omen:1},
-  essVigor:{n:'Essence of Vigor',d:'Adds one guaranteed high-tier Life mod (Physical damage on weapons). Keeps existing mods. One essence per item.',cost:{gel:14,copper:10},ess:{weapon:'addPhys',other:'life'}},
-  essRot:{n:'Essence of Rot',d:'Adds one guaranteed high-tier Poison Resistance mod (Poison damage on weapons). Keeps existing mods. One essence per item.',cost:{silk:12,glowcap:8},ess:{weapon:'addPoison',other:'poisonRes'}},
-  essFrost:{n:'Essence of Frost',d:'Adds one guaranteed high-tier Cold Resistance mod (Cold damage on weapons). Keeps existing mods. One essence per item.',cost:{crystal:12,silk:4},ess:{weapon:'addCold',other:'coldRes'}},
-  essCinder:{n:'Essence of Cinders',d:'Adds one guaranteed high-tier Fire Resistance mod (Fire damage on weapons). Keeps existing mods. One essence per item.',cost:{ember:12,crystal:4},ess:{weapon:'addFire',other:'fireRes'}}
+  essVigor:{n:'Essence of Vigor',d:'Adds one guaranteed high-tier Life mod (Physical damage on weapons). Keeps existing mods. One essence per item (Scouring Sand resets this).',cost:{gel:14,copper:10},ess:{weapon:'addPhys',other:'life'}},
+  essRot:{n:'Essence of Rot',d:'Adds one guaranteed high-tier Poison Resistance mod (Poison damage on weapons). Keeps existing mods. One essence per item (Scouring Sand resets this).',cost:{silk:12,glowcap:8},ess:{weapon:'addPoison',other:'poisonRes'}},
+  essFrost:{n:'Essence of Frost',d:'Adds one guaranteed high-tier Cold Resistance mod (Cold damage on weapons). Keeps existing mods. One essence per item (Scouring Sand resets this).',cost:{crystal:12,silk:4},ess:{weapon:'addCold',other:'coldRes'}},
+  essCinder:{n:'Essence of Cinders',d:'Adds one guaranteed high-tier Fire Resistance mod (Fire damage on weapons). Keeps existing mods. One essence per item (Scouring Sand resets this).',cost:{ember:12,crystal:4},ess:{weapon:'addFire',other:'fireRes'}}
 };
 const CKEYS=Object.keys(CUR);
 const CHARMS={
@@ -1435,7 +1435,7 @@ function viewGuide(){
     <li>Weapon damage, speed and crit modifiers change the weapon's own numbers, shown in blue. Armour modifiers do the same on armour.</li>
     <li>Salvage gear you don't need for materials. Use <b>Select</b> on the Gear tab to salvage many at once. Tap an item and choose <b>Favorite</b> to protect it: favorites (★) can never be salvaged.</li></ul>`);
   h+=sec('Crafting currency',`${CKEYS.map(k=>`<div class="row" style="display:block"><b>${CUR[k].n}</b><div class="note">${CUR[k].d}</div></div>`).join('')}
-    <p style="margin:8px 0 0"><b>A typical path:</b> Tinker (Normal to Magic), then Graft, then Crown (to Rare), then Ascension to fill it. Use Chaos or Void to reroll bad modifiers, and Seals to protect the good half. An <b>Essence</b> adds one guaranteed high-tier modifier without touching the others (Normal becomes Magic, a full Magic becomes Rare), but each item can only ever take <b>one</b> essence, so pick it carefully.</p>`);
+    <p style="margin:8px 0 0"><b>A typical path:</b> Tinker (Normal to Magic), then Graft, then Crown (to Rare), then Ascension to fill it. Use Chaos or Void to reroll bad modifiers, and Seals to protect the good half. An <b>Essence</b> adds one guaranteed high-tier modifier without touching the others (Normal becomes Magic, a full Magic becomes Rare), but each item can only take <b>one</b> essence. Removing the essence's modifier doesn't change that; only <b>Scouring Sand</b> (which wipes the whole item) lets it take another.</p>`);
   h+=sec('Materials',`${MKEYS.map(k=>`<div class="row"><span style="text-align:left;color:${MATS[k].c}">${MATS[k].n}</span><span>${{copper:'Mines ore',gel:'Mines monsters',glowcap:'Fungal ore',silk:'Fungal monsters',crystal:'Crystal Depths',ember:'Magma Vents',starmetal:'Chests, Champions and bosses, floor 3+',voidshard:'The Abyss, floor 9+'}[k]}</span></div>`).join('')}`);
   h+=sec('Saving your progress',`<p style="margin:0">Progress saves automatically in this browser. Clearing browser data or switching devices can lose it, so use <b>Back up</b> on the Run tab to copy a code, and <b>Restore</b> to load it anywhere.</p>`);
   $('#view').innerHTML=h;
@@ -1750,7 +1750,7 @@ function useCur(k,it){
     case 'ascend':rollMod(it,R);break;
     case 'chaos':{const m=removeOne();rollMod(it,R);msg+=`Removed: ${DESC[m.a](m.v)}. `;break}
     case 'void':{const m=removeOne();msg+=`Removed: ${DESC[m.a](m.v)}.`;if(!it.mods.length&&it.rarity===1)it.rarity=1;break}
-    case 'scour':it.mods=[];it.rarity=0;it.name='';break;
+    case 'scour':it.mods=[];it.rarity=0;it.name='';if(it.ess){delete it.ess;msg='Essence mark cleared: this item can take an essence again. '}break;
     case 'divine':for(const m of it.mods)m.v=m.u?(AFF[m.a].dec?Math.round((m.lo+R()*(m.hi-m.lo))*10)/10:Math.round(m.lo+R()*(m.hi-m.lo))):rollVal(m.a,m.t,R);break;
   }
   const added=it.mods.filter(m=>!before.has(m));
