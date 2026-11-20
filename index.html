@@ -561,8 +561,8 @@ const saveSummary=x=>({at:x.savedAt||Date.now(),best:x.best||0,cleared:x.cleared
 const progressScore=x=>(x.prestige||0)*1e6+(x.cleared||0)*1e3+(x.runs||0);
 let idbReady=false,lastSnapAt=0,idbOK=null,persisted=null,staleTab=false,myWriteT=0;
 function migrate(){if(S.set)S.set.target=0;
-  if(!S.uqs1){S.uqs1=1;const seen=new Set(),walk=(o,d)=>{if(!o||typeof o!=='object'||d>6||seen.has(o))return;seen.add(o);if(o.uq&&Array.isArray(o.mods)&&!o.usc){o.usc=1;for(const m of o.mods)if(m.u&&typeof m.v==='number'&&m.v>0&&AFF[m.a]){const q=uqScale(m.a,o.ilvl||1),f=AFF[m.a].dec?10:1;m.v=Math.round(m.v*q*f)/f;if(m.lo!=null){m.lo=Math.round(m.lo*q*f)/f;m.hi=Math.round(m.hi*q*f)/f}}return}for(const k in o)walk(o[k],d+1)};walk(S,0)}
-  if(!S.uq115){S.uq115=1;const seen=new Set(),walk=(o,d)=>{if(!o||typeof o!=='object'||d>6||seen.has(o))return;seen.add(o);if(o.uq&&Array.isArray(o.mods)){for(const m of o.mods)if(m.u&&typeof m.v==='number'&&m.v>0){const f=AFF[m.a]&&AFF[m.a].dec?10:1;m.v=Math.round(m.v*1.15*f)/f;if(m.lo!=null){m.lo=Math.round(m.lo*1.15*f)/f;m.hi=Math.round(m.hi*1.15*f)/f}}return}for(const k in o)walk(o[k],d+1)};walk(S,0)}if(S.tab==='craft'){S.tab='refine';S.townTab='craft'}
+  if(!S.uqs1){S.uqs1=1;const seen=new Set(),walk=(o,d)=>{if(!o||typeof o!=='object'||d>6||seen.has(o))return;seen.add(o);if(o.uq&&Array.isArray(o.mods)&&!o.usc){o.usc=1;for(const m of o.mods)if(m.u&&typeof m.v==='number'&&m.v>0&&AFF[m.a]){const q=uqScale(m.a,o.ilvl||1),f=AFF[m.a].dec?10:1;m.v=Math.round(m.v*q*f)/f;if(m.lo!=null){m.lo=Math.round(m.lo*q*f)/f;m.hi=Math.round(m.hi*q*f)/f}}return}for(const k in o)walk(o[k],d+1)};try{walk(S,0)}catch(e){console.error(e)}}
+  if(!S.uq115){S.uq115=1;const seen=new Set(),walk=(o,d)=>{if(!o||typeof o!=='object'||d>6||seen.has(o))return;seen.add(o);if(o.uq&&Array.isArray(o.mods)){for(const m of o.mods)if(m.u&&typeof m.v==='number'&&m.v>0){const f=AFF[m.a]&&AFF[m.a].dec?10:1;m.v=Math.round(m.v*1.15*f)/f;if(m.lo!=null){m.lo=Math.round(m.lo*1.15*f)/f;m.hi=Math.round(m.hi*1.15*f)/f}}return}for(const k in o)walk(o[k],d+1)};try{walk(S,0)}catch(e){console.error(e)}}if(S.tab==='craft'){S.tab='refine';S.townTab='craft'}
 if(S.v4&&!S.v5){S.v5=1;S.inv.push(newItem('mallet',1),newItem('gnarledstaff',1),newItem('twinshivs',1),newItem('shortbow',1))}
 if(S.v3&&!S.v4){S.v4=1;S.inv.push(newItem('slippers',2))}
 if(S.cleared==null)S.cleared=Math.max(0,(S.best||0)-1);if(!S.set.startFloor)S.set.startFloor=1;if(S.set.autoSwap==null)S.set.autoSwap=true;if(S.set.descendHp==null)S.set.descendHp=40;if(S.set.smart==null)S.set.smart=true;if(S.set.idleLen==null)S.set.idleLen=5;if(!S.omen)S.omen={};if(!S.tree)S.tree={};if(!S.maps)S.maps=[];if(!S.town)S.town={};if(!S.prestige)S.prestige=0;for(const k in S.tree)if(!TREE.find(n=>n.id===k))delete S.tree[k];if(!S.lvl)S.lvl=1;if(S.xp==null)S.xp=0;if(!S.flags)S.flags={};if(!S.cur)S.cur={};if(!S.mats)S.mats={};if(!S.invCap)S.invCap=40;if(!S.shelves)S.shelves=0;
@@ -737,13 +737,13 @@ function itemHTML(it,newMods){
 
 // ================= STATS =================
 const LOCALW=['addPhys','incPhys','incAps','incCrit'];
-const uqBaseC={};
+var uqBaseC={};
 function ibase(it){const b=BASES[it.base];if(!it.uq||it.ilvl<=b.f)return b;const ck=it.base+'@'+it.ilvl;if(uqBaseC[ck])return uqBaseC[ck];
   let ref=null,rp=0;const pw=x=>x.min!=null?(x.min+x.max)*x.aps:(x.armour||0);
   for(const k in BASES){const x=BASES[k];if(x.slot!==b.slot||x.cls!==b.cls||x.f>it.ilvl)continue;const v=pw(x);if(v>rp){rp=v;ref=x}}
   const nb={...b},own=pw(b);if(ref&&own>0&&rp>own){const k=rp/own;if(b.min!=null){nb.min=Math.round(b.min*k);nb.max=Math.round(b.max*k)}else nb.armour=Math.round(b.armour*k)}
   return uqBaseC[ck]=nb}
-const uqScale=(a,il)=>{const top=l=>{const t=AFF[a].t.filter(t=>t[0]<=l);return t[t.length-1][2]};return il>20?top(il)/top(20):1};
+function uqScale(a,il){const top=l=>{const t=AFF[a].t.filter(t=>t[0]<=l);return t[t.length-1][2]};return il>20?top(il)/top(20):1}
 function localStats(it){
   const b=ibase(it),o={},em=1+.05*(it.emp||0),sum=k=>it.mods.filter(m=>m.a===k).reduce((a,m)=>a+m.v,0)*em;
   if(b.min){const ap=sum('addPhys'),ip=sum('incPhys'),ia=sum('incAps'),ic=sum('incCrit'),f=1+ip/100;
