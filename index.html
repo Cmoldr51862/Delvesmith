@@ -852,13 +852,20 @@ class Sim{
   dangerAt(x,y){const L=this.L,dg=this.st.dodge||0;for(const q of L.puddles){if(q.seen&&q.warn<=.55&&Math.hypot(x-q.x,y-q.y)<q.r+8)return q}
     const i=Math.floor(y/TS)*L.W+Math.floor(x/TS);if(L.tiles[i]===3){const ph=(this.t+L.ventOff[i])%3.2;if(ph>=1.9){const cyc=Math.floor((this.t+L.ventOff[i])/3.2);if(this.roll(Math.round(L.ventOff[i]*1000),cyc)*100<dg)return{x:(i%L.W+.5)*TS,y:(Math.floor(i/L.W)+.5)*TS}}}return null}
   trapDmg(){return mDMG(this.floor)}
-  frontier(px,py){// nearest known floor tile that borders unexplored space (BFS over explored floor)
-    const L=this.L,W=L.W,H=L.H,st=Math.floor(py/TS)*W+Math.floor(px/TS),prev=new Int32Array(W*H).fill(-1),q=[st];prev[st]=st;
-    for(let h=0;h<q.length;h++){const c=q[h],cx=c%W,cy=(c/W)|0;
+  ridMap(){const L=this.L,W=L.W;if(!L.rid){L.rid=new Int16Array(W*L.H).fill(-1);for(const r of L.rooms)for(let y=r.y;y<r.y+r.h;y++)for(let x=r.x;x<r.x+r.w;x++)L.rid[y*W+x]=r.id}return L.rid}
+  frontier(px,py){// best target by walking distance: seen loot/ore, a room not yet entered, or an edge of unexplored space (corridors and the current room preferred)
+    const L=this.L,W=L.W,H=L.H,st=Math.floor(py/TS)*W+Math.floor(px/TS),dist=new Int32Array(W*H).fill(-1),q=[st];dist[st]=0;const rid=this.ridMap(),cur=rid[st];
+    const loot=new Map();for(const n of L.nodes){const k=Math.floor((n.y+n.h/2)/TS)*W+Math.floor((n.x+n.w/2)/TS);if(L.seen[k])loot.set(k,n)}for(const c of L.chests)if(!c.open){const k=Math.floor((c.y+c.h/2)/TS)*W+Math.floor((c.x+c.w/2)/TS);if(L.seen[k])loot.set(k,c)}
+    const vis=L.vis||{};let best=null,bs=1e9;
+    for(let h=0;h<q.length;h++){const c=q[h],cx=c%W,cy=(c/W)|0,d=dist[c];if(d-14>bs)break;
+      if(h>0){const o=loot.get(c);if(o){const sc=d-3-(rid[c]>=0&&rid[c]===cur?20:0);if(sc<bs){bs=sc;best={x:o.x+o.w/2,y:o.y+o.h/2,o,k:c}}}
+        const ri=rid[c];if(ri>=0&&!vis[ri]&&inRoom(L.rooms[ri],(cx+.5)*TS,(cy+.5)*TS)&&d<bs){const r=L.rooms[ri];bs=d;best={x:(r.cx+.5)*TS,y:(r.cy+.5)*TS,k:c,room:ri}}}
+      let edge=false;
       for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=cx+dx,ny=cy+dy;if(nx<0||ny<0||nx>=W||ny>=H)continue;const n=ny*W+nx;
-        if(!L.seen[n]&&L.tiles[c]!==1)return{x:(cx+.5)*TS,y:(cy+.5)*TS};
-        if(prev[n]>=0||L.tiles[n]===1||!L.seen[n])continue;prev[n]=c;q.push(n)}}
-    return null}
+        if(!L.seen[n]&&L.tiles[c]!==1&&L.tiles[n]!==1)edge=true;
+        if(dist[n]>=0||L.tiles[n]===1||!L.seen[n])continue;dist[n]=d+1;q.push(n)}
+      if(edge){const sc=d-(rid[c]<0?10:0)-(rid[c]>=0&&rid[c]===cur?20:0);if(sc<bs){bs=sc;best={x:(cx+.5)*TS,y:(cy+.5)*TS,k:c,edge:1}}}}
+    return best}
   hzOn(ci,ahead){const L=this.L,tv=L.tiles[ci];if(tv===2&&L.b===1)return false;{const t=this.t+(ahead||0)+(L.ventOff[ci]||0);return tv===2?t%2.8>=1.6:tv===3?t%3.2>=2.6:false}}
   dot(n,each,src,split){for(let i=1;i<=n;i++)this.ev.push({at:this.t+i,f:()=>{if(!this.done){this.hurt(each,src,split);this.fx(this.P.x+9,this.P.y-12,src.split(' ')[0].toLowerCase(),'#ff8a5a')}}})}
   wc(){return WCLASS[this.st.wclass||'sword']}
@@ -1073,11 +1080,11 @@ class Sim{
       const de=Math.hypot(L.entrance.x-p.x,L.entrance.y-p.y),dx=Math.hypot(L.exit.x-p.x,L.exit.y-p.y);
       if(de<dx||(L.boss&&L.boss.hp>0)){s.state='retreat';s.logm('Pulling out: heading back to the entrance','#ff9a7a')}else{s.exitMode=true;s.logm('Pulling out: heading for the exit','#ff9a7a')}}
     // ---- explore: reveal what the runner can see, track visited rooms
-    {const ptx0=Math.floor(pcx/TS),pty0=Math.floor(pcy/TS),k0=pty0*L.W+ptx0;if(s.lastSeenK!==k0){s.lastSeenK=k0;const V=7;for(let dy=-V;dy<=V;dy++)for(let dx=-V;dx<=V;dx++)if(dx*dx+dy*dy<=V*V){const x=ptx0+dx,y=pty0+dy;if(x>=0&&y>=0&&x<L.W&&y<L.H)L.seen[y*L.W+x]=1}
-      L.vis=L.vis||{};for(const r of L.rooms)if(!L.vis[r.id]&&inRoom(r,pcx,pcy)){L.vis[r.id]=1;L.rv=(L.rv||0)+1}}}
+    {const ptx0=Math.floor(pcx/TS),pty0=Math.floor(pcy/TS),k0=pty0*L.W+ptx0;if(L.litK!==k0){L.litK=k0;const V=6.5;L.lit=L.lit||new Uint8Array(L.W*L.H);L.lit.fill(0);L.seen[k0]=1;L.lit[k0]=1;for(let r=0;r<120;r++){const an=r*Math.PI/60,cx3=Math.cos(an),cy3=Math.sin(an);let lx=ptx0,ly=pty0;for(let d=.3;d<=V;d+=.25){const x=Math.floor(ptx0+.5+cx3*d),y=Math.floor(pty0+.5+cy3*d);if(x<0||y<0||x>=L.W||y>=L.H)break;if(x!==lx&&y!==ly&&L.tiles[ly*L.W+x]===1&&L.tiles[y*L.W+lx]===1)break;lx=x;ly=y;L.seen[y*L.W+x]=1;L.lit[y*L.W+x]=1;if(L.tiles[y*L.W+x]===1)break}}}
+      L.vis=L.vis||{};for(const r of L.rooms)if(!L.vis[r.id]&&inRoom(r,pcx,pcy)){L.vis[r.id]=1;L.rv=(L.rv||0)+1}}
     // ---- choose what to do
-    let tgt=null,best=1e9;
-    for(const e of L.enemies){const ex=e.x+e.w/2,ey=e.y+e.h/2,d=Math.hypot(ex-pcx,ey-pcy);if(d>5*TS)continue;
+    let tgt=null,best=1e9;const curR=L.rooms.find(r=>inRoom(r,pcx,pcy));if(curR)L.cur=curR.id;const cr=L.cur!=null?L.rooms[L.cur]:null,inCR=(x,y)=>cr&&x>=cr.x*TS&&x<(cr.x+cr.w)*TS&&y>=cr.y*TS&&y<(cr.y+cr.h)*TS;
+    for(const e of L.enemies){const ex=e.x+e.w/2,ey=e.y+e.h/2,d=Math.hypot(ex-pcx,ey-pcy);if(d>5*TS&&!(curR&&d<11*TS&&inCR(ex,ey)))continue;
       const reach=p.w/2+Math.max(e.w,e.h)/2+wc.reach;
       if(s.state==='retreat')continue;
       if(d<best&&(d<1.5*TS||los(L,pcx,pcy,ex,ey))){best=d;tgt=e}}
@@ -1091,11 +1098,16 @@ class Sim{
       else{
         if(s.ri<L.order.length){
           const seenAt=(x,y)=>L.seen[Math.floor(y/TS)*L.W+Math.floor(x/TS)];let ob=null,od=1e9;
-          for(const n of L.nodes){const nx=n.x+n.w/2,ny=n.y+n.h/2;if(!seenAt(nx,ny))continue;const d=Math.hypot(nx-pcx,ny-pcy);if(d<od){od=d;ob={k:'n',o:n}}}
-          for(const c of L.chests){if(c.open)continue;const cx2=c.x+c.w/2,cy2=c.y+c.h/2;if(!seenAt(cx2,cy2))continue;const d=Math.hypot(cx2-pcx,cy2-pcy);if(d<od){od=d;ob={k:'c',o:c}}}
-          if(ob){if(ob.k==='n'&&od<=p.w/2+ob.o.w/2+16)atkN=ob.o;else goal=cen(ob.o)}
-          else{s.exT=(s.exT||0)-dt;if(!s.exG||s.exT<=0||Math.hypot(s.exG.x-pcx,s.exG.y-pcy)<TS*.6){s.exG=s.frontier(pcx,pcy);s.exT=1.5}
-            if(s.exG)goal=s.exG;else s.ri=L.order.length}
+          // 1) finish the room we're in: its loot, ore and unseen corners
+          if(cr){for(const n of L.nodes){const nx=n.x+n.w/2,ny=n.y+n.h/2;if(!inCR(nx,ny)||!seenAt(nx,ny))continue;const d=Math.hypot(nx-pcx,ny-pcy);if(d<od){od=d;ob={k:'n',o:n}}}
+            for(const c of L.chests){if(c.open)continue;const cx2=c.x+c.w/2,cy2=c.y+c.h/2;if(!inCR(cx2,cy2)||!seenAt(cx2,cy2))continue;const d=Math.hypot(cx2-pcx,cy2-pcy);if(d<od){od=d;ob={k:'c',o:c}}}
+            if(!ob)for(let yy=cr.y;yy<cr.y+cr.h;yy++)for(let xx=cr.x;xx<cr.x+cr.w;xx++){const k=yy*L.W+xx;if(L.seen[k]||L.tiles[k]===1)continue;const tx2=(xx+.5)*TS,ty2=(yy+.5)*TS,d=Math.hypot(tx2-pcx,ty2-pcy);if(d<od){od=d;ob={k:'t',o:{x:tx2,y:ty2}}}}}
+          if(ob){if(ob.k==='n'&&od<=p.w/2+ob.o.w/2+16)atkN=ob.o;else goal=ob.k==='t'?ob.o:cen(ob.o)}
+          else{// 2) nearest (by walking distance) loot, unexplored edge, corridor or unvisited room
+            s.exT=(s.exT||0)-dt;const gone=s.exG&&s.exG.o&&(s.exG.o.open||!L.nodes.includes(s.exG.o)&&!L.chests.includes(s.exG.o));
+            const resolved=s.exG&&(s.exG.edge&&![[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>{const n=s.exG.k+dy*L.W+dx;return !L.seen[n]&&L.tiles[n]!==1})||s.exG.room!=null&&(L.vis||{})[s.exG.room]);
+            if(!s.exG||gone||resolved||s.exT<=0||Math.hypot(s.exG.x-pcx,s.exG.y-pcy)<TS*.6){s.exG=s.frontier(pcx,pcy);s.exT=6}
+            if(s.exG){const o=s.exG.o;if(o&&L.nodes.includes(o)&&Math.hypot(o.x+o.w/2-pcx,o.y+o.h/2-pcy)<=p.w/2+o.w/2+16)atkN=o;else goal=s.exG}else s.ri=L.order.length}
         }
         if(!goal&&!atkN&&s.ri>=L.order.length)goal=L.boss&&L.boss.hp>0?cen(L.boss):s.decided?cen(L.stairs):cen(L.exit);
       }
@@ -1196,7 +1208,7 @@ class Sim{
       if(q.warn>0){q.warn-=dt;if(q.warn<=0){s.pfx(q.x,q.y,q.blast?'#ffb070':B.enemy,q.blast?20:12,q.blast?200:140);if(q.blast)s.ring(q.x,q.y,q.r,'#ffb070',.4);if(Math.hypot(px2-q.x,py2-q.y)<q.r+6){s.hurt(q.blast?q.dmg:q.dmg*.5,q.name,q.rock?{phys:1}:q.gas?{poison:1}:null);if(q.rock)p.slowT=Math.max(p.slowT||0,.8);if(s.done)return}}}
       else{q.life-=dt;q.tick-=dt;if(q.tick<=0&&Math.hypot(px2-q.x,py2-q.y)<q.r){q.tick=.5;s.hurt(q.dmg*.4,q.gas?q.name:q.name+' puddle',q.gas?{poison:1}:undefined);if(s.done)return}}}
     L.puddles=L.puddles.filter(q=>q.warn>0||q.life>0);
-    for(const t of L.turrets){t.cd-=dt;if(t.cd<=0){t.cd=t.per*(L.b===1?1.7:1);const tx=(t.tx+.5)*TS,ty=(t.ty+.5)*TS,fb=L.b===3,sp=fb?190:260;if(L.b===1){if(Math.hypot(px2-tx,py2-ty)<8*TS){s.pud=(s.pud||0)+1;const gx=px2+(s.rng()-.5)*30,gy=py2+(s.rng()-.5)*30;L.puddles.push({x:gx,y:gy,sx:tx+t.dx*14,sy:ty+t.dy*14,r:42,warn:.9,w0:.9,life:3.2,tick:0,dmg:s.trapDmg()*.7,name:'Spore gas',gas:1,seen:s.roll(77,s.pud)*100<(st.dodge||0)*1.5})}}
+    for(const t of L.turrets){t.cd-=dt;if(t.cd<=0){t.cd=t.per*(L.b===1?1.7:1);const tx=(t.tx+.5)*TS,ty=(t.ty+.5)*TS,fb=L.b===3,sp=fb?190:260;if(L.b===1){const rid=s.ridMap(),tr=rid[(t.ty+t.dy)*L.W+t.tx+t.dx],pr=rid[Math.floor(py2/TS)*L.W+Math.floor(px2/TS)];if(tr>=0?pr===tr:Math.hypot(px2-tx,py2-ty)<8*TS&&los(L,tx+t.dx*20,ty+t.dy*20,px2,py2)){s.pud=(s.pud||0)+1;const gx=px2+(s.rng()-.5)*30,gy=py2+(s.rng()-.5)*30;L.puddles.push({x:gx,y:gy,sx:tx+t.dx*14,sy:ty+t.dy*14,r:42,warn:.9,w0:.9,life:3.2,tick:0,dmg:s.trapDmg()*.7,name:'Spore gas',gas:1,seen:s.roll(77,s.pud)*100<(st.dodge||0)*1.5})}}
       else if(Math.hypot(px2-tx,py2-ty)<9*TS)L.shots.push({x:tx+t.dx*18,y:ty+t.dy*18,vx:t.dx*sp,vy:t.dy*sp,life:4,fire:fb,name:fb?'Fireball trap':null})}}
     for(const c of L.carts||[]){if(c.wait>0){c.wait-=dt;continue}c.pos+=c.dir*4.2*dt;if(c.pos>=c.a1){c.pos=c.a1;c.dir=-1;c.wait=.8}else if(c.pos<=c.a0){c.pos=c.a0;c.dir=1;c.wait=.8}
       const cx=(c.horiz?c.pos+.5:c.row+.5)*TS,cy=(c.horiz?c.row+.5:c.pos+.5)*TS;
@@ -2249,8 +2261,7 @@ function draw(){
   let cx=pcx-vw/2,cy=pcy-vh/2-30/scale;cx=vw>=LW?-(vw-LW)/2:clamp(cx,0,LW-vw);cy=vh>=LH?-(vh-LH)/2:clamp(cy,-90/scale,LH-vh);
   ctx.fillStyle='#07060a';ctx.fillRect(0,0,cv.width,cv.height);
   ctx.setTransform(sc,0,0,sc,-cx*sc,-cy*sc);
-  for(let dy=-VIS;dy<=VIS;dy++)for(let dx=-VIS;dx<=VIS;dx++)if(dx*dx+dy*dy<=VIS*VIS){const x=ptx+dx,y=pty+dy;if(x>=0&&y>=0&&x<L.W&&y<L.H)L.seen[y*L.W+x]=1}
-  const vis=(tx,ty)=>(tx-ptx)*(tx-ptx)+(ty-pty)*(ty-pty)<=VIS*VIS;
+  const vis=(tx,ty)=>L.lit?L.lit[ty*L.W+tx]===1:(tx-ptx)*(tx-ptx)+(ty-pty)*(ty-pty)<=VIS*VIS;
   const tx0=Math.max(0,Math.floor(cx/TS)),tx1=Math.min(L.W-1,Math.floor((cx+vw)/TS)),ty0=Math.max(0,Math.floor(cy/TS)),ty1=Math.min(L.H-1,Math.floor((cy+vh)/TS));
   const FC=FLOORC[L.b];
   for(let ty=ty0;ty<=ty1;ty++)for(let tx=tx0;tx<=tx1;tx++){
