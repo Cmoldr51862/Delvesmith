@@ -167,6 +167,7 @@ const MATS={
 };
 const MKEYS=Object.keys(MATS);
 const MATVAL={copper:1,gel:1,glowcap:2,silk:2,crystal:3,ember:4,starmetal:10,voidshard:6};
+const XRATE={copper:400,gel:400,glowcap:200,silk:200,crystal:130,ember:100,voidshard:70};
 const itemVal=it=>[1.5,3.5,7][it.rarity]+it.ilvl*.3;
 const TYPES=['phys','poison','cold','fire'];
 const TCOL={phys:'#e8e2d6',poison:'#7ee36b',cold:'#8fd3ff',fire:'#ff9a4a'};
@@ -522,9 +523,10 @@ const CUR={
   chaos:{n:'Chaos Shard',d:'Rare: remove a random modifier, then add a new one',cost:{silk:8,gel:10,glowcap:4}},
   void:{n:'Void Orb',d:'Remove a random modifier',cost:{crystal:8,silk:5}},
   scour:{n:'Scouring Sand',d:'Strip all modifiers, back to Normal. Also lets the item take an essence again',cost:{copper:4,gel:3}},
+  temper:{n:'Tempering Orb',d:'Upgrade a random modifier by one tier (up to the best tier the item level allows) and reroll it in the new tier. Seals steer it like Chaos and Void',cost:{copper:40,gel:40,glowcap:35,silk:35,starmetal:2}},
   divine:{n:'Divine Dust',d:'Reroll every modifier value within its tier',cost:{starmetal:3,crystal:6}},
-  sealP:{n:'Prefix Seal',d:'Omen: your next Chaos or Void cannot remove prefixes',cost:{starmetal:2,silk:8},omen:1},
-  sealS:{n:'Suffix Seal',d:'Omen: your next Chaos or Void cannot remove suffixes',cost:{starmetal:2,silk:8},omen:1},
+  sealP:{n:'Prefix Seal',d:'Omen: your next Chaos, Void or Tempering Orb cannot touch prefixes',cost:{starmetal:2,silk:8},omen:1},
+  sealS:{n:'Suffix Seal',d:'Omen: your next Chaos, Void or Tempering Orb cannot touch suffixes',cost:{starmetal:2,silk:8},omen:1},
   essVigor:{n:'Essence of Vigor',d:'Adds one guaranteed high-tier Life mod (Physical damage on weapons, or % increased Physical Damage if the weapon already has added Physical damage). Keeps existing mods. One essence per item (Scouring Sand resets this).',cost:{gel:14,copper:10},ess:{weapon:'addPhys',weapon2:'incPhys',other:'life'}},
   essRot:{n:'Essence of Rot',d:'Adds one guaranteed high-tier Poison Resistance mod (Poison damage on weapons). Keeps existing mods. One essence per item (Scouring Sand resets this).',cost:{silk:12,glowcap:8},ess:{weapon:'addPoison',other:'poisonRes'}},
   essFrost:{n:'Essence of Frost',d:'Adds one guaranteed high-tier Cold Resistance mod (Cold damage on weapons). Keeps existing mods. One essence per item (Scouring Sand resets this).',cost:{crystal:12,silk:4},ess:{weapon:'addCold',other:'coldRes'}},
@@ -1425,7 +1427,7 @@ function applyResult(res,charm){
   try{guildWeekCount(res);clearTimeout(pushMember.t);pushMember.t=setTimeout(pushMember,1500)}catch(e){}
   S.report=rep;persist();snapNow();backupPrompt();empIntro();updTabDots();return rep;
 }
-function salvageMats(it){const b=biomeOf(it.ilvl),sets=[['copper','gel'],['glowcap','silk'],['crystal','silk'],['ember','crystal'],['voidshard','ember']][b],n=1+it.rarity+Math.floor(it.ilvl/3),o={};for(let i=0;i<n;i++){const k=sets[i%2];o[k]=(o[k]||0)+1}
+function salvageMats(it){const b=biomeOf(it.ilvl),sets=[['copper','gel'],['glowcap','silk'],['crystal','silk'],['ember','crystal'],['voidshard','ember']][b],n=1+it.rarity+Math.floor(it.ilvl<=30?it.ilvl/3:10+(it.ilvl-30)/10),o={};for(let i=0;i<n;i++){const k=sets[i%2];o[k]=(o[k]||0)+1}
   if(it.emp){const back=empRefund(it);for(const k in back)o[k]=(o[k]||0)+back[k]}return o}
 function empRefund(it){const o={};for(let n=0;n<(it.emp||0);n++){const c=empCost(n);for(const k in c)o[k]=(o[k]||0)+c[k]}for(const k in o)o[k]=Math.floor(o[k]*.5);return o}
 
@@ -1876,12 +1878,14 @@ function canUse(k,it){
     case 'void':return it.rarity>0&&removable(it).length>0;
     case 'scour':return it.rarity>0;
     case 'divine':return it.mods.length>0;
+    case 'temper':return it.rarity>0&&temperable(it).length>0;
   }
   return false;
 }
 function essAff(it,c){let fa=it.slot==='weapon'?c.ess.weapon:c.ess.other;if(it.slot==='weapon'&&c.ess.weapon2&&it.mods.some(m=>m.a===fa))fa=c.ess.weapon2;return fa}
 function essFits(it,c){if(it.ess||it.rarity>2)return false;const fa=essAff(it,c),a=AFF[fa];if(!a||!a.slots.includes(it.slot)||it.mods.some(m=>m.a===fa)||a.t[0][0]>it.ilvl)return false;
   const same=it.mods.filter(m=>isP(m)===!!a.p).length;return it.rarity===2?same<3:true}
+function temperable(it){return it.mods.filter(m=>!m.u&&AFF[m.a]&&AFF[m.a].t[m.t+1]&&AFF[m.a].t[m.t+1][0]<=it.ilvl&&!(S.omen.sealP&&isP(m))&&!(S.omen.sealS&&!isP(m)))}
 function removable(it){return it.mods.filter(m=>!(S.omen.sealP&&isP(m))&&!(S.omen.sealS&&!isP(m)))}
 function useCur(k,it){
   const c=CUR[k],R=Math.random;
@@ -1898,10 +1902,11 @@ function useCur(k,it){
     case 'chaos':{const m=removeOne();rollMod(it,R);msg+=`Removed: ${DESC[m.a](m.v)}. `;break}
     case 'void':{const m=removeOne();msg+=`Removed: ${DESC[m.a](m.v)}.`;if(!it.mods.length&&it.rarity===1)it.rarity=1;break}
     case 'scour':it.mods=[];it.rarity=0;it.name='';if(it.ess){delete it.ess;msg='Essence mark cleared: this item can take an essence again. '}break;
+    case 'temper':{const pool=temperable(it),m=pool[Math.floor(R()*pool.length)],old=DESC[m.a](m.v),ot=tierLabel(m);m.t++;m.v=rollVal(m.a,m.t,R);lastNew=[m];if(S.omen.sealP||S.omen.sealS){S.omen.sealP=0;S.omen.sealS=0;msg+='Seal consumed. '}msg+=`Tempered: ${old} (${ot}) → ${DESC[m.a](m.v)} (${tierLabel(m)})`;break}
     case 'divine':for(const m of it.mods)m.v=m.u?(AFF[m.a].dec?Math.round((m.lo+R()*(m.hi-m.lo))*10)/10:Math.round(m.lo+R()*(m.hi-m.lo))):rollVal(m.a,m.t,R);break;
   }
   const added=it.mods.filter(m=>!before.has(m));
-  if(k==='divine')lastNew=it.mods.slice();else lastNew=added;
+  if(k==='divine')lastNew=it.mods.slice();else if(k!=='temper')lastNew=added;
   if(added.length&&!c.ess)msg+=`Added: ${added.map(m=>`${DESC[m.a](m.v)} (${tierLabel(m)})`).join(', ')}`;
   if(k==='divine')msg='Values rerolled.';
   persist();viewCraft();if(msg)toast(msg);
@@ -1988,11 +1993,12 @@ function shelfCost(){const n=S.shelves||0,c={copper:8+n*6,gel:6+n*4};if(n>=1)c.g
 function viewRefine(emb,part){
   if(!emb){viewTown();return}
   let h='';if(part==='refine'){h+=`<div class="card"><h3>Refinery${S.town.refinery?` <span style="color:#5dd68c">−${S.town.refinery*8}% costs</span>`:''}</h3><div class="note">Turn materials into crafting currency.</div></div>`;
+  h+=`<div class="card"><h3>Material exchange</h3><div class="note" style="margin-bottom:8px">Trade surplus materials up for Starmetal. Bosses, Wardens and chests are still the cheaper source.</div>${Object.entries(XRATE).map(([m,r])=>{const have=S.mats[m]||0,mx=Math.floor(have/r),n=Math.min(10,mx);return `<div class="row" style="align-items:center"><span style="text-align:left"><span style="color:${MATS[m].c}">${r} ${MATS[m].n}</span> → <span style="color:${MATS.starmetal.c}">1 Starmetal</span><br><span class="note">have ${have}</span></span><span style="display:flex;gap:6px"><button class="btn small" data-xch="${m}:1" ${mx>=1?'':'disabled'}>Trade</button><button class="btn small ghost" data-xch="${m}:${Math.max(2,n)}" ${n>=2?'':'disabled'}>×${Math.max(2,n)}</button></span></div>`}).join('')}</div>`;
   const group=(title,keys,src,kind)=>{h+=`<div class="card"><h3>${title}</h3>`;for(const k of keys){const r=src[k],have=kind==='charm'?'':`have ${S.cur[k]||0}`;
     const charmBlock=kind==='charm'&&S.charm;const rcst=refCost(r.cost);
     h+=`<div class="recipe"><div class="rhead"><span class="rname">${r.n}</span><span class="rhave">${have}</span></div><div class="reff">${kind==='charm'?`If the runner dies, keep ${r.save*100}% of the bag. Breaks when used.`:r.d}</div>${costHTML(rcst)}
       <div class="rfoot"><button class="btn small" data-make="${kind}:${k}:1" ${afford(rcst)&&!charmBlock?'':'disabled'}>${charmBlock?'Charm equipped':'Make'}</button>${kind==='charm'?'':(()=>{const mx=maxMake(rcst),n=Math.min(5,mx);return `<button class="btn small ghost" data-make="${kind}:${k}:${Math.max(2,n)}" ${n>=2?'':'disabled'}>×${Math.max(2,n)}</button>`})()}</div></div>`}h+='</div>'};
-  group('Orbs',['tinker','graft','crown','ascend','chaos','void','scour','divine'],CUR,'cur');
+  group('Orbs',['tinker','graft','crown','ascend','chaos','void','scour','divine','temper'],CUR,'cur');
   group('Essences (guaranteed modifier)',['essVigor','essRot','essFrost','essCinder'],CUR,'cur');
   group('Omens',['sealP','sealS'],CUR,'cur');
   group('Charms',Object.keys(CHARMS),CHARMS,'charm');}
@@ -2001,6 +2007,7 @@ function viewRefine(emb,part){
     <div class="rfoot"><button class="btn small" id="shelfBtn" ${S.invCap<120&&afford(sc)?'':'disabled'}>${S.invCap<120?'Build shelf':'Maxed out'}</button></div></div></div>`}
   $('#refineHost').innerHTML=h;
   {const sb=$('#shelfBtn');if(sb)sb.onclick=()=>{const c=shelfCost();if(!afford(c)||S.invCap>=120)return;pay(c);S.shelves++;S.invCap+=10;persist();const y=$('#town').scrollTop;viewTown();$('#town').scrollTop=y;toast(`Inventory now holds ${S.invCap}`)}}
+  document.querySelectorAll('[data-xch]').forEach(b=>b.onclick=()=>{const[m,n]=b.dataset.xch.split(':'),r=XRATE[m]*+n;if((S.mats[m]||0)<r)return;S.mats[m]-=r;S.mats.starmetal=(S.mats.starmetal||0)+ +n;persist();const y=$('#town').scrollTop;viewTown();$('#town').scrollTop=y;toast(`+${n} Starmetal`)});
   document.querySelectorAll('[data-make]').forEach(b=>b.onclick=()=>{const[kind,k,n]=b.dataset.make.split(':');const src=kind==='charm'?CHARMS:CUR;
     const rc2=refCost(src[k].cost);if(!afford(rc2,+n))return;pay(rc2,+n);
     S.flags.refined=1;if(kind==='charm'){S.flags.charm=1;S.charm={n:CHARMS[k].n,save:CHARMS[k].save};toast(`${CHARMS[k].n} equipped`)}else{S.cur[k]=(S.cur[k]||0)+ +n;toast(`+${n} ${CUR[k].n}`)}
@@ -2107,7 +2114,7 @@ function endLive(){
   modal(rep.outcome==='died'?'Your runner died':'Run complete',reportHTML(rep,computeStats(S.eq)),[{label:'Back to the workshop',fn:()=>{mode='town';$('#game').classList.add('hidden');$('#town').classList.remove('hidden');setTab('run');if(mp&&rep.outcome!=='died'&&(res.cleared||0)>=mp.floor)mapReward(mp)}}]);
 }
 function mapReward(mp){const F=mp.floor,n=mp.n,R=Math.random,sc=1+n*.25,opts=[];
-  const curPick=()=>{const pool=['chaos','chaos','void','ascend','divine','scour','crown','graft'],o={};const k=2+Math.floor(F/10);for(let i=0;i<k;i++){const c=pool[Math.floor(R()*pool.length)];o[c]=(o[c]||0)+Math.max(1,Math.round((1+F/12)*sc))}return o};
+  const curPick=()=>{const pool=['chaos','chaos','void','ascend','divine','scour','crown','graft'],o={};const k=F>=60?4:3;for(let i=0;i<k;i++){const c=pool[Math.floor(R()*pool.length)],rare=c==='ascend'||c==='divine';o[c]=(o[c]||0)+Math.max(1,Math.round((2+F/20)*sc*(rare?.5:1)))}return o};
   const all=[
     {id:'unique',w:F>=8?2:0,mk:()=>{const it=mkUnique(UQK[Math.floor(R()*UQK.length)],R,F+2);return{t:'Unique item',d:`<span style="color:#ff9a3a">${itemName(it)}</span> (${BASES[it.base].n})`,give:()=>{S.inv.push(it)}}}},
     {id:'rare',w:3,mk:()=>{let it=genItem(R,F+3,1.5);let g=0;while(it.rarity<2&&g++<20)it=genItem(R,F+3,1.5);return{t:'Rare gear',d:`<span style="color:${RCOL[it.rarity]}">${itemName(it)}</span> · ${BASES[it.base].n}, item level ${it.ilvl}`,give:()=>{S.inv.push(it)}}}},
