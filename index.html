@@ -324,7 +324,8 @@ const bsplit=f=>{const B=BIOMES[biomeOf(f)].split;if(!cycOf(f))return B;const A=
 const bname=f=>BIOMES[biomeOf(f)].name+cycName(f);
 // Smooth difficulty: growth per floor starts steep and eases toward a steady rate (no biome jumps)
 const mkCurve=(a,b,c,t,T)=>{const C=[1,1],L=Math.log;return f=>{f=Math.max(1,Math.floor(f));while(C.length<=f){const i=C.length-1;C.push(C[i]*Math.exp(L(c)+(L(b)-L(c))*Math.exp(-(i-1)/T)+(L(a)-L(b))*Math.exp(-(i-1)/t)))}return C[f]}};
-const hpCurve=mkCurve(1.2,1.11,1.032,14,25),dmgCurve=mkCurve(1.14,1.082,1.024,14,25);
+const hpCurve0=mkCurve(1.2,1.11,1.032,14,25),dmgCurve0=mkCurve(1.14,1.082,1.024,14,25),DEEP0=55;
+const hpCurve=f=>hpCurve0(f)*Math.pow(1.02,Math.max(0,Math.floor(f)-DEEP0)),dmgCurve=f=>dmgCurve0(f)*Math.pow(1.015,Math.max(0,Math.floor(f)-DEEP0));
 const mHP=f=>25*hpCurve(f),mDMG=f=>6*dmgCurve(f);
 const ramp=(f,k)=>Math.pow(k,Math.max(0,f-10)),wHP=f=>25*Math.pow(1.17,f-1)*Math.pow(1.2,bidxOf(f))*ramp(f,1.09),wDMG=f=>6*Math.pow(1.13,f-1)*Math.pow(1.17,bidxOf(f))*ramp(f,1.07);
 const danger=f=>Math.round(mHP(f)/25*10)/10;
@@ -440,7 +441,16 @@ const AFF={
 {const RM={1:1,2:4,3:6,4:9,6:14,8:20,12:25};var REMAP_T=RM}
 for(const k in AFF){const a=AFF[k],l=a.t[a.t.length-1],f=a.dec?10:1;a.t.push([12,Math.round(l[2]*1.15*f)/f,Math.round(l[2]*1.4*f)/f,a.p?'Abyssal':'of the Abyss'])}
 for(const k in AFF)for(const t of AFF[k].t)t[0]=REMAP_T[t[0]]||t[0];
+{const SOFT=['dodge','ms','lootFind','bagCap','fireRes','coldRes','poisonRes'],NP=['Titanic','Eldritch','Godforged'],NS=['of the Deep','of the Ancients','of the Godhead'];
+ for(const k in AFF){const a=AFF[k],f=a.dec?10:1,g=SOFT.includes(k)?1.12:['life','armour','incArmour','regen','lifeOnHit'].includes(k)?1.4:1.18;[40,60,80].forEach((il,i)=>{const l=a.t[a.t.length-1];a.t.push([il,Math.round(l[2]*1.04*f)/f,Math.max(Math.round(l[2]*g*f)/f,l[2]+1/f),a.p?NP[i]:NS[i]])})}}
+for(const k in UNIQ)UNIQ[k].mods=UNIQ[k].mods.map(([a,lo,hi])=>{const f=AFF[a].dec?10:1;return[a,Math.round(lo*1.15*f)/f,Math.round(hi*1.15*f)/f]});
+
 {const BM={1:1,2:3,3:6,4:8,5:11,6:13,7:16,10:20};for(const k in BASES)BASES[k].f=BM[BASES[k].f]||BASES[k].f}
+{// deep bases: three stronger versions of every Void base, found from depth 40, 60 and 80
+ const MAT=[['deep','Deepsteel',40],['star','Starforged',60],['prim','Primordial',80]];
+ for(const k of Object.keys(BASES).filter(k=>BASES[k].f===20)){const b=BASES[k];MAT.forEach(([pk,pn,f],i)=>{const m=Math.pow(1.25,i+1),ma=Math.pow(1.5,i+1),im=Math.pow(1.22,i+1),nb={...b,n:b.n.replace(/^Void /,pn+' '),f};
+   if(nb.n===b.n)nb.n=pn+' '+b.n;if(b.min!=null){nb.min=Math.round(b.min*m);nb.max=Math.round(b.max*m)}if(b.armour)nb.armour=Math.round(b.armour*ma);
+   if(b.imp){nb.imp={};for(const a in b.imp)nb.imp[a]=a==='dodge'||a==='ms'||a==='bagCap'||/Res$/.test(a)?Math.round(b.imp[a]*Math.pow(1.1,i+1)):Math.round(b.imp[a]*im)}BASES[pk+'_'+k]=nb})}}
 const rr=v=>`${Math.max(1,Math.round(v*.75))}–${Math.max(1,Math.round(v*1.25))}`;
 const DESC={addPhys:v=>`Adds ${rr(v)} Physical Damage`,incPhys:v=>`${v}% increased Physical Damage`,addFire:v=>`Adds ${rr(v)} Fire Damage`,addCold:v=>`Adds ${rr(v)} Cold Damage`,addPoison:v=>`Adds ${rr(v)} Poison Damage`,
   life:v=>`+${v} to maximum Life`,armour:v=>`+${v} to Armour`,incArmour:v=>`${v}% increased Armour`,ms:v=>`${v}% increased Movement Speed`,
@@ -494,7 +504,8 @@ const IDB={db:null,open(){return this.db||(this.db=new Promise((res,rej)=>{try{c
 const saveSummary=x=>({at:x.savedAt||Date.now(),best:x.best||0,cleared:x.cleared||0,runs:x.runs||0,items:(x.inv||[]).length,lvl:x.lvl||1,prestige:x.prestige||0});
 const progressScore=x=>(x.prestige||0)*1e6+(x.cleared||0)*1e3+(x.runs||0);
 let idbReady=false,lastSnapAt=0,idbOK=null,persisted=null,staleTab=false,myWriteT=0;
-function migrate(){if(S.set)S.set.target=0;if(S.tab==='craft'){S.tab='refine';S.townTab='craft'}
+function migrate(){if(S.set)S.set.target=0;
+  if(!S.uq115){S.uq115=1;const seen=new Set(),walk=(o,d)=>{if(!o||typeof o!=='object'||d>6||seen.has(o))return;seen.add(o);if(o.uq&&Array.isArray(o.mods)){for(const m of o.mods)if(m.u&&typeof m.v==='number'&&m.v>0){const f=AFF[m.a]&&AFF[m.a].dec?10:1;m.v=Math.round(m.v*1.15*f)/f;if(m.lo!=null){m.lo=Math.round(m.lo*1.15*f)/f;m.hi=Math.round(m.hi*1.15*f)/f}}return}for(const k in o)walk(o[k],d+1)};walk(S,0)}if(S.tab==='craft'){S.tab='refine';S.townTab='craft'}
 if(S.v4&&!S.v5){S.v5=1;S.inv.push(newItem('mallet',1),newItem('gnarledstaff',1),newItem('twinshivs',1),newItem('shortbow',1))}
 if(S.v3&&!S.v4){S.v4=1;S.inv.push(newItem('slippers',2))}
 if(S.cleared==null)S.cleared=Math.max(0,(S.best||0)-1);if(!S.set.startFloor)S.set.startFloor=1;if(S.set.autoSwap==null)S.set.autoSwap=true;if(S.set.descendHp==null)S.set.descendHp=40;if(S.set.smart==null)S.set.smart=true;if(S.set.idleLen==null)S.set.idleLen=5;if(!S.omen)S.omen={};if(!S.tree)S.tree={};if(!S.maps)S.maps=[];if(!S.town)S.town={};if(!S.prestige)S.prestige=0;for(const k in S.tree)if(!TREE.find(n=>n.id===k))delete S.tree[k];if(!S.lvl)S.lvl=1;if(S.xp==null)S.xp=0;if(!S.flags)S.flags={};if(!S.cur)S.cur={};if(!S.mats)S.mats={};if(!S.invCap)S.invCap=40;if(!S.shelves)S.shelves=0;
@@ -640,7 +651,7 @@ const dropIL=f=>f+Math.floor(f/4);
 function genItem(rand,floor,boost,wk){
   if(wk){boost=(boost||0)+Math.min(.3,(floor-1)*.01);floor=dropIL(floor)}
   const keys=Object.keys(BASES).filter(k=>BASES[k].f<=floor);
-  const ws=keys.map(k=>BASES[k].f>=floor-5?3:1);let s=ws.reduce((a,b)=>a+b,0),q=rand()*s,base=keys[0];
+  const ws=keys.map(k=>(BASES[k].f>=floor-5?3:1)*(floor>=40?1+2*Math.pow(BASES[k].f/floor,2):1));let s=ws.reduce((a,b)=>a+b,0),q=rand()*s,base=keys[0];
   for(let i=0;i<keys.length;i++){q-=ws[i];if(q<0){base=keys[i];break}}
   const it=newItem(base,floor);const r=rand();
   if(r<.05+boost*.3){it.rarity=2;it.name=rareName(rand);const n=3+Math.floor(rand()*3);for(let i=0;i<n;i++)rollMod(it,rand)}
@@ -1484,7 +1495,7 @@ function viewGuide(){
     <p style="margin:0"><b>Weekly Challenge:</b> everyone gets the same dungeon for a week. Go as deep as you can. Your best run is saved, and posted to the shared leaderboard when this link supports it.</p>`);
   h+=sec('Gear basics',`<ul style="padding-left:18px;margin:0">
     <li><b>10 slots:</b> weapon, helmet, body, gloves, boots, belt, amulet, 2 rings and a backpack. Backpacks and belts add bag space.</li>
-    <li><b>Item level</b> (ilvl) is the floor an item dropped on. Better modifier tiers need higher item levels.</li>
+    <li><b>Item level</b> (ilvl) is the floor an item dropped on. Better modifier tiers need higher item levels: the top tiers unlock at item level 25, 40, 60 and 80, and stronger Deepsteel, Starforged and Primordial bases start dropping at depth 40, 60 and 80.</li>
     <li><b>Rarity:</b> <span class="r0">Normal</span> has no modifiers, <span class="r1">Magic</span> has up to 1 prefix and 1 suffix, and <span class="r2">Rare</span> has up to 3 of each.</li>
     <li><b>Tiers:</b> labels like P3 or S1 mean prefix tier 3 or suffix tier 1. <b>Tier 1 is the best.</b></li>
     <li>Weapon damage, speed and crit modifiers change the weapon's own numbers, shown in blue. Armour modifiers do the same on armour.</li>
@@ -2607,7 +2618,7 @@ function fightAnim(a,b,aEnd,bEnd,won,line,done,pvp){modal(pvp?'Arena fight':'Rai
   setTimeout(()=>{const L=$('#fL');if(L)L.innerHTML=`<b style="color:${won?'#5dd68c':'#ff9a7a'}">${line}</b>`;if(btn){btn.disabled=false;btn.textContent='OK';btn.onclick=()=>{$('#modal').classList.add('hidden');paused=false;done&&done()}}},2600)}
 
 updTabDots();
-window.__ds={SPECS,idleRot,idleSet,localStats,empIntro,abyssMods,salv:salvageMats,Sim,computeStats,genItem,weekMods,mkUnique,mkMap,get S(){return S},get sim(){return sim},rollMod,simIdleRun,get pend(){return idlePending}};setTab(S.tab||'run');resize();initCloud();requestAnimationFrame(frame);
+window.__ds={AFF,BASES,SPECS,idleRot,idleSet,localStats,empIntro,abyssMods,salv:salvageMats,Sim,computeStats,genItem,weekMods,mkUnique,mkMap,get S(){return S},get sim(){return sim},rollMod,simIdleRun,get pend(){return idlePending}};setTab(S.tab||'run');resize();initCloud();requestAnimationFrame(frame);
 })();
 </script>
 </body>
