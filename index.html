@@ -1297,7 +1297,9 @@ function applyResult(res,charm){
   try{guildWeekCount(res);clearTimeout(pushMember.t);pushMember.t=setTimeout(pushMember,1500)}catch(e){}
   S.report=rep;persist();snapNow();backupPrompt();empIntro();updTabDots();return rep;
 }
-function salvageMats(it){const b=biomeOf(it.ilvl),sets=[['copper','gel'],['glowcap','silk'],['crystal','silk'],['ember','crystal'],['voidshard','ember']][b],n=1+it.rarity+Math.floor(it.ilvl/3),o={};for(let i=0;i<n;i++){const k=sets[i%2];o[k]=(o[k]||0)+1}return o}
+function salvageMats(it){const b=biomeOf(it.ilvl),sets=[['copper','gel'],['glowcap','silk'],['crystal','silk'],['ember','crystal'],['voidshard','ember']][b],n=1+it.rarity+Math.floor(it.ilvl/3),o={};for(let i=0;i<n;i++){const k=sets[i%2];o[k]=(o[k]||0)+1}
+  if(it.emp){const back=empRefund(it);for(const k in back)o[k]=(o[k]||0)+back[k]}return o}
+function empRefund(it){const o={};for(let n=0;n<(it.emp||0);n++){const c=empCost(n);for(const k in c)o[k]=(o[k]||0)+c[k]}for(const k in o)o[k]=Math.floor(o[k]*.5);return o}
 
 // ================= TOWN VIEWS =================
 function setTab(t){if(t==='craft'){t='refine';S.townTab='craft'}S.tab=t;persist();document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));updTabDots();render();$('#town').scrollTop=0}
@@ -1700,7 +1702,7 @@ function viewCraft(){
       const on=c.omen&&S.omen[k];return `<button class="cur ${on?'on':''}" data-cur="${k}" ${ok||on?'':'disabled'}><b>${c.n}<span>${n}</span></b><small>${on?'ACTIVE: tap to cancel':c.d}</small></button>`}).join('')}</div>
       <div class="note" style="margin-top:8px">Make more currency in Town → Refining from dungeon materials.</div></div>`;}
   if(it&&part==='emp'){
-    {const n=it.emp||0,c=empCost(n),ch=empChance(n),lock=idleLocked(it);h+=`<div class="card" id="empCard" style="border-color:#6a4a2a"><h3 style="color:#ffb070">⬆ Empower · +${n} → +${n+1}</h3><div class="note" style="margin-bottom:8px">Every level adds 5% to all of this item's stats, and it never caps. Each attempt costs more and is less likely to work. A failed attempt uses up the materials but never harms the item.</div>
+    {const n=it.emp||0,c=empCost(n),ch=empChance(n),lock=idleLocked(it);h+=`<div class="card" id="empCard" style="border-color:#6a4a2a"><h3 style="color:#ffb070">⬆ Empower · +${n} → +${n+1}</h3><div class="note" style="margin-bottom:8px">Every level adds 5% to all of this item's stats, and it never caps. Each attempt costs more and is less likely to work. A failed attempt uses up the materials but never harms the item. Salvaging an Empowered item refunds half the materials its successful levels cost.</div>
       <div class="row"><b>Success chance</b><span style="color:${ch>=70?'#5dd68c':ch>=45?'#ffd36a':'#ff9a7a'}">${ch}%</span></div>${costHTML(c)}<button class="btn" id="empBtn" style="margin-top:10px" ${afford(c)&&!lock?'':'disabled'}>Empower</button></div>`}
   }
   if(it&&part==='craft'){
