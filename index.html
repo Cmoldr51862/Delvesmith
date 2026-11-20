@@ -1657,6 +1657,14 @@ function importSave(){
     offerRestore(r);
   };
 }
+function swapDiff(it,k){const a=computeStats(S.eq),b=computeStats({...S.eq,[k]:it}),f=Math.max(1,S.best||1);
+  const rows=[['DPS',a.dps,b.dps,1],['Life',a.life,b.life,0],['Armour',a.armour,b.armour,0],['Fire res',a.res.fire,b.res.fire,0,'%'],['Cold res',a.res.cold,b.res.cold,0,'%'],['Poison res',a.res.poison,b.res.poison,0,'%'],
+    ['Hazard Dodge',a.dodge,b.dodge,0,'%'],['Life per hit',a.lifeOnHit,b.lifeOnHit,1],['Regen /s',a.regen,b.regen,1],['Move speed',a.ms,b.ms,0,'%'],['Materials',a.lootFind,b.lootFind,0,'%'],['Bag space',a.bag,b.bag,0]];
+  const fmt=(v,d)=>d?Math.round(v*10)/10:Math.round(v);
+  const ch=rows.filter(r=>Math.abs(r[2]-r[1])>=(r[3]?.05:.5)).map(([n,x,y,d,u])=>{const up=y>x;return `<div class="row"><b>${n}</b><span>${fmt(x,d)}${u||''} → <b style="color:${up?'#5dd68c':'#ff8a7a'}">${fmt(y,d)}${u||''}</b> <small style="color:${up?'#5dd68c':'#ff8a7a'}">${up?'▲':'▼'}${fmt(Math.abs(y-x),d)}</small></span></div>`});
+  const sa=gearScore(S.eq,f),sb=gearScore({...S.eq,[k]:it},f),r=sb/sa;
+  const v=r>1.03?['Upgrade','#5dd68c']:r<.97?['Downgrade','#ff8a7a']:['About even','#ffd36a'];
+  return `<div class="card" style="margin:0 0 10px;border-color:${v[1]}55"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b style="color:${v[1]};font-size:16px">${v[0]}</b><span class="note">if you equip this${k==='ring2'?' (ring 2)':''}</span></div>${ch.length?ch.join(''):'<div class="note">No change to your stats.</div>'}<div class="note" style="margin-top:6px">Overall rating uses the Balanced setting from Equip best (damage and survival at depth ${f}).</div></div>`}
 function itemModal(it){
   const eq=isEquipped(it),lock=idleLocked(it),btns=[];
   const equipTo=k=>()=>{S.flags.equipped=1;const old=S.eq[k];S.inv=S.inv.filter(i=>i.uid!==it.uid);if(old)S.inv.push(old);S.eq[k]=it;persist();render()};
@@ -1673,9 +1681,10 @@ function itemModal(it){
   btns.push({label:it.fav?'★ Remove favorite':'☆ Favorite (protect from salvage)',cls:'ghost',fn:()=>{it.fav=!it.fav;persist();render();toast(it.fav?'Favorited: it can\'t be salvaged':'Removed from favorites')}});
   if(!eq&&!it.fav){const m=salvageMats(it);btns.push({label:'Hold to salvage for '+Object.entries(m).map(([k,v])=>v+' '+MATS[k].n).join(', '),cls:'ghost',hold:1,fn:()=>{S.inv=S.inv.filter(i=>i.uid!==it.uid);for(const k in m)S.mats[k]=(S.mats[k]||0)+m[k];persist();render();toast('Salvaged')}})}
   let cmp='';
+  let diff='';if(!eq){const ks=it.slot==='ring'?(S.eq.ring&&S.eq.ring2?['ring','ring2']:[S.eq.ring?'ring2':'ring']):[it.slot];diff=ks.map(k=>swapDiff(it,k)).join('')}
   if(!eq){const cur=(it.slot==='ring'?['ring','ring2']:[it.slot]).map(k=>S.eq[k]).filter(Boolean);if(cur.length)cmp=`<div class="note" style="margin:10px 0 6px">Currently equipped:</div>`+cur.map(c=>itemHTML(c)).join('<div style="height:6px"></div>')}
   btns.push({label:'Close',cls:'ghost'});
-  modal((it.fav?'★ ':'')+(eq?'Equipped item':'Item'),itemHTML(it)+cmp+(it.fav&&!eq?'<div class="note" style="margin-top:8px;color:#ffd36a">Favorited, so it can\'t be salvaged. Remove the favorite first if you want to scrap it.</div>':'')+(S.idle&&!eq?'<div class="note warn" style="margin-top:8px">Gear swaps are locked during an idle run.</div>':''),btns);
+  modal((it.fav?'★ ':'')+(eq?'Equipped item':'Item'),diff+itemHTML(it)+cmp+(it.fav&&!eq?'<div class="note" style="margin-top:8px;color:#ffd36a">Favorited, so it can\'t be salvaged. Remove the favorite first if you want to scrap it.</div>':'')+(S.idle&&!eq?'<div class="note warn" style="margin-top:8px">Gear swaps are locked during an idle run.</div>':''),btns);
 }
 
 let lastNew=null;
