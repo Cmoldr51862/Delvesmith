@@ -471,7 +471,7 @@ const CUR={
   divine:{n:'Divine Dust',d:'Reroll every modifier value within its tier',cost:{starmetal:3,crystal:6}},
   sealP:{n:'Prefix Seal',d:'Omen: your next Chaos or Void cannot remove prefixes',cost:{starmetal:2,silk:8},omen:1},
   sealS:{n:'Suffix Seal',d:'Omen: your next Chaos or Void cannot remove suffixes',cost:{starmetal:2,silk:8},omen:1},
-  essVigor:{n:'Essence of Vigor',d:'Adds one guaranteed high-tier Life mod (Physical damage on weapons). Keeps existing mods. One essence per item (Scouring Sand resets this).',cost:{gel:14,copper:10},ess:{weapon:'addPhys',other:'life'}},
+  essVigor:{n:'Essence of Vigor',d:'Adds one guaranteed high-tier Life mod (Physical damage on weapons, or % increased Physical Damage if the weapon already has added Physical damage). Keeps existing mods. One essence per item (Scouring Sand resets this).',cost:{gel:14,copper:10},ess:{weapon:'addPhys',weapon2:'incPhys',other:'life'}},
   essRot:{n:'Essence of Rot',d:'Adds one guaranteed high-tier Poison Resistance mod (Poison damage on weapons). Keeps existing mods. One essence per item (Scouring Sand resets this).',cost:{silk:12,glowcap:8},ess:{weapon:'addPoison',other:'poisonRes'}},
   essFrost:{n:'Essence of Frost',d:'Adds one guaranteed high-tier Cold Resistance mod (Cold damage on weapons). Keeps existing mods. One essence per item (Scouring Sand resets this).',cost:{crystal:12,silk:4},ess:{weapon:'addCold',other:'coldRes'}},
   essCinder:{n:'Essence of Cinders',d:'Adds one guaranteed high-tier Fire Resistance mod (Fire damage on weapons). Keeps existing mods. One essence per item (Scouring Sand resets this).',cost:{ember:12,crystal:4},ess:{weapon:'addFire',other:'fireRes'}}
@@ -1800,7 +1800,8 @@ function canUse(k,it){
   }
   return false;
 }
-function essFits(it,c){if(it.ess||it.rarity>2)return false;const fa=it.slot==='weapon'?c.ess.weapon:c.ess.other,a=AFF[fa];if(!a||!a.slots.includes(it.slot)||it.mods.some(m=>m.a===fa)||a.t[0][0]>it.ilvl)return false;
+function essAff(it,c){let fa=it.slot==='weapon'?c.ess.weapon:c.ess.other;if(it.slot==='weapon'&&c.ess.weapon2&&it.mods.some(m=>m.a===fa))fa=c.ess.weapon2;return fa}
+function essFits(it,c){if(it.ess||it.rarity>2)return false;const fa=essAff(it,c),a=AFF[fa];if(!a||!a.slots.includes(it.slot)||it.mods.some(m=>m.a===fa)||a.t[0][0]>it.ilvl)return false;
   const same=it.mods.filter(m=>isP(m)===!!a.p).length;return it.rarity===2?same<3:true}
 function removable(it){return it.mods.filter(m=>!(S.omen.sealP&&isP(m))&&!(S.omen.sealS&&!isP(m)))}
 function useCur(k,it){
@@ -1809,7 +1810,7 @@ function useCur(k,it){
   if(!canUse(k,it)||!(S.cur[k]>0))return;
   S.cur[k]--;S.flags.crafted=1;const before=new Set(it.mods);let msg='';
   const removeOne=()=>{const pool=removable(it);const m=pool[Math.floor(R()*pool.length)];it.mods=it.mods.filter(x=>x!==m);if(S.omen.sealP||S.omen.sealS){S.omen.sealP=0;S.omen.sealS=0;msg+='Seal consumed. '}return m};
-  if(c.ess){const fa=it.slot==='weapon'?c.ess.weapon:c.ess.other,a=AFF[fa],same=it.mods.filter(m=>isP(m)===!!a.p).length;if(it.rarity===0)it.rarity=1;else if(it.rarity===1&&(same>=1||it.mods.length>=2)){it.rarity=2;it.name=rareName(R)}rollMod(it,R,fa,true);it.ess=k;msg=`${c.n} added a guaranteed modifier. This item can't take another essence.`}
+  if(c.ess){const fa=essAff(it,c),a=AFF[fa],same=it.mods.filter(m=>isP(m)===!!a.p).length;if(it.rarity===0)it.rarity=1;else if(it.rarity===1&&(same>=1||it.mods.length>=2)){it.rarity=2;it.name=rareName(R)}rollMod(it,R,fa,true);it.ess=k;msg=`${c.n} added a guaranteed modifier. This item can't take another essence.`}
   else switch(k){
     case 'tinker':it.rarity=1;rollMod(it,R);break;
     case 'graft':rollMod(it,R);break;
@@ -2619,7 +2620,7 @@ function fightAnim(a,b,aEnd,bEnd,won,line,done,pvp){modal(pvp?'Arena fight':'Rai
   setTimeout(()=>{const L=$('#fL');if(L)L.innerHTML=`<b style="color:${won?'#5dd68c':'#ff9a7a'}">${line}</b>`;if(btn){btn.disabled=false;btn.textContent='OK';btn.onclick=()=>{$('#modal').classList.add('hidden');paused=false;done&&done()}}},2600)}
 
 updTabDots();
-window.__ds={AFF,BASES,SPECS,idleRot,idleSet,localStats,empIntro,abyssMods,salv:salvageMats,Sim,computeStats,genItem,weekMods,mkUnique,mkMap,get S(){return S},get sim(){return sim},rollMod,simIdleRun,get pend(){return idlePending}};setTab(S.tab||'run');resize();initCloud();requestAnimationFrame(frame);
+window.__ds={essAff,essFits,CUR,AFF,BASES,SPECS,idleRot,idleSet,localStats,empIntro,abyssMods,salv:salvageMats,Sim,computeStats,genItem,weekMods,mkUnique,mkMap,get S(){return S},get sim(){return sim},rollMod,simIdleRun,get pend(){return idlePending}};setTab(S.tab||'run');resize();initCloud();requestAnimationFrame(frame);
 })();
 </script>
 </body>
