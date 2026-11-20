@@ -126,7 +126,7 @@ canvas{display:block;width:100%;height:100%}
 <body>
 
 <div id="town">
-  <div id="tabs"><button data-tab="run">Run</button><button data-tab="gear">Gear</button><button data-tab="tree">Tree</button><button data-tab="refine">Town</button><button data-tab="guide">Guide</button></div>
+  <div id="tabs"><button data-tab="run">Run</button><button data-tab="gear">Gear</button><button data-tab="tree">Tree</button><button data-tab="refine">Town</button><button data-tab="social">Social</button><button data-tab="guide">Guide</button></div>
   <div class="wrap" id="view"></div>
 </div>
 
@@ -545,7 +545,7 @@ const fbDB={collection(p){const F=FB.F;const wrapQ=q=>({orderBy(f,d){return wrap
     async get(){const sn=await F.getDocs(q);return{docs:sn.docs.map(d=>({id:d.id,data:()=>d.data()}))}}});
   return Object.assign(wrapQ(F.collection(FB.db,p)),{doc(id){const r=F.doc(FB.db,p,id);return{async get(){const sn=await F.getDoc(r);return{exists:sn.exists(),data:()=>sn.data()}},set(v){return F.setDoc(r,v)}}}})}};
 async function fbSync(user){fbUser=user;DB=fbDB;
-  if(!user){UID=null;cloudRef=null;cloudState='signedout';updSaveCard();lbState='idle';if(S.tab==='run')loadBoard();return}
+  if(!user){UID=null;cloudRef=null;cloudState='signedout';updSaveCard();lbState='idle';if(S.tab==='run')loadBoard();if(S.tab==='social')render();return}
   UID=user.uid;cloudState='checking';updSaveCard();
   if(!S.nick&&user.displayName){S.nick=user.displayName.split(' ')[0].slice(0,18)}
   try{const ref=DB.collection('users').doc(user.uid);const snap=await Promise.race([ref.get(),new Promise(r=>setTimeout(()=>r('timeout'),12000))]);
@@ -555,7 +555,7 @@ async function fbSync(user){fbUser=user;DB=fbDB;
       if(r&&r.eq&&progressScore(r)>progressScore(S)&&mode!=='live'){snapNow();S=r;migrate();myWriteT=0;try{localStorage.setItem(KEY+'_t','0')}catch(e){}persist();render();toast('Loaded your cloud save')}}
     await ref.set({json:JSON.stringify(S),at:S.savedAt||Date.now(),best:S.best||0,name:(S.nick||'Runner').slice(0,18)});cloudState='on'}
   catch(e){cloudState=(e&&e.code==='permission-denied')?'rules':'error'}
-  updSaveCard();lbState='idle';if(S.tab==='run')loadBoard()}
+  updSaveCard();lbState='idle';if(S.tab==='run')loadBoard();if(cloudState==='on'){claimSales();pushMember()}if(S.tab==='social')render()}
 async function fbSignInGoogle(){try{await fbLoad();const p=new FB.Au.GoogleAuthProvider();try{await FB.Au.signInWithPopup(FB.auth,p)}catch(e){if(e&&/popup|cancelled-popup|operation-not-supported/.test(e.code||'')){await FB.Au.signInWithRedirect(FB.auth,p)}else throw e}}catch(e){toast('Google sign-in failed: '+((e&&e.code)||'try email instead').replace('auth/',''))}}
 function fbEmailModal(){modal('Sign in with email',`<div class="note" style="margin-bottom:8px">Use any email and a password (6+ characters). New here? Tap <b>Create account</b>.</div>
   <input id="fbEm" type="email" placeholder="Email" autocomplete="email" style="width:100%;margin-bottom:8px;background:#120f18;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:16px">
@@ -1271,7 +1271,8 @@ function reportHTML(rep,st){
 function applyResult(res,charm){
   const died=res.outcome==='died',frac=died?(charm?charm.save:0):1;
   const keptMats={},lostMats={};let lostUnits=0;
-  for(const k in res.bag){const v=res.bag[k],kv=Math.floor(v*frac+1e-9);keptMats[k]=kv;lostMats[k]=v-kv;lostUnits+=v-kv;S.mats[k]=(S.mats[k]||0)+kv}
+  const gb=typeof guildBuffPct==='function'?guildBuffPct():0;
+  for(const k in res.bag){const v=res.bag[k],kv=Math.floor(v*frac*(1+gb/100)+1e-9);keptMats[k]=kv;lostMats[k]=Math.max(0,v-Math.floor(v*frac+1e-9));lostUnits+=lostMats[k];S.mats[k]=(S.mats[k]||0)+kv}
   const nk=res.hoarder?res.items.length:Math.floor(res.items.length*frac+1e-9),keptItems=res.items.slice(0,nk),lostItems=res.items.slice(nk);lostUnits+=lostItems.length;
   for(const it of keptItems){if(S.inv.length<S.invCap)S.inv.push(it);else{const m=salvageMats(it);for(const k in m)S.mats[k]=(S.mats[k]||0)+m[k]}}
   if(died&&charm)S.charm=null;
@@ -1281,6 +1282,7 @@ function applyResult(res,charm){
   const ups=gainXP((res.xp||0)*(1+.1*(S.town.training||0)));S.bossKills=(S.bossKills||0)+(res.bosses||0);
   const rep=Object.assign({},res,{levelUps:ups,newLvl:S.lvl,keptMats,lostMats,keptItems,lostItems,lostUnits,charmName:charm?charm.n:null,charmSave:charm?charm.save:0});
   delete rep.log;delete rep.items;rep.logTail=res.log.slice(-14);
+  try{guildWeekCount(res);clearTimeout(pushMember.t);pushMember.t=setTimeout(pushMember,1500)}catch(e){}
   S.report=rep;persist();snapNow();backupPrompt();empIntro();updTabDots();return rep;
 }
 function salvageMats(it){const b=biomeOf(it.ilvl),sets=[['copper','gel'],['glowcap','silk'],['crystal','silk'],['ember','crystal'],['voidshard','ember']][b],n=1+it.rarity+Math.floor(it.ilvl/3),o={};for(let i=0;i<n;i++){const k=sets[i%2];o[k]=(o[k]||0)+1}return o}
@@ -1355,7 +1357,7 @@ const TT=[['craft','Crafting'],['emp','Empowering'],['refine','Refining'],['buil
 function hubBar(){const t=S.townTab||'craft',dot=!(S.flags||{}).empSeen&&(S.best||0)>=2;return `<h1>TOWN</h1><div class="chips" style="margin:0 0 12px;gap:6px;flex-wrap:wrap">${TT.map(([k,n])=>`<button class="btn small ${t===k?'':'ghost'}" data-tt="${k}" style="width:auto;flex:1;min-width:0;padding:8px 2px;font-size:12px;white-space:nowrap">${n}${k==='emp'&&dot?'<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#ff9a3a;margin-left:4px;vertical-align:top"></span>':''}</button>`).join('')}</div>`}
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-tt]');if(!b)return;S.townTab=b.dataset.tt;persist();render();$('#town').scrollTop=0});
 function viewHub(){const t=S.townTab||'craft';if(t==='craft'||t==='emp')viewCraft();else viewTown()}
-function render(){if(S.tab==='craft'){S.tab='refine';S.townTab='craft'}({run:viewRun,gear:viewGear,tree:viewTree,refine:viewHub,guide:viewGuide})[S.tab||'run']();tutTick()}
+function render(){if(S.tab==='craft'){S.tab='refine';S.townTab='craft'}if(S.tab!=='social')socOff();({run:viewRun,gear:viewGear,tree:viewTree,refine:viewHub,social:viewSocial,guide:viewGuide})[S.tab||'run']();tutTick()}
 const TUT=[
   {id:'run',t:'Send your first run',d:'On the Run tab, tap <b>Single run</b> and watch your runner fight, mine ore and grab loot. It comes back automatically.',tab:'run',sel:'#liveBtn',done:()=>S.runs>0},
   {id:'refine',t:'Refine a Tinker Orb',d:'Materials become crafting currency. On the Town tab, open <b>Refining</b> and make a <b>Tinker Orb</b> from Copper Ore.',tab:'refine',tt:'refine',sel:'[data-make="cur:tinker:1"]',done:()=>S.flags.refined},
@@ -1848,7 +1850,7 @@ function commitRun(r){
   for(const k in r.cur||{})(P.cur=P.cur||{})[k]=((P.cur||{})[k]||0)+r.cur[k];
   r.items.forEach((it,j)=>{if(j>=nk){P.lost++;return}P.units++;if(it.rarity===0){const m=salvageMats(it);for(const k in m)P.mats[k]=(P.mats[k]||0)+m[k];P.salv++}else P.items.push(it)});
   P.xp=(P.xp||0)+(r.xp||0);P.bosses=(P.bosses||0)+(r.bosses||0);
-  P.runs++;if(died)P.deaths++;else P.escapes++;P.kills+=r.kills;P.deep=Math.max(P.deep,r.floor);P.cleared=Math.max(P.cleared,r.cleared||0);
+  P.runs++;if(died)P.deaths++;else P.escapes++;P.kills+=r.kills;P.deep=Math.max(P.deep,r.floor);P.cleared=Math.max(P.cleared,r.cleared||0);P.fl=(P.fl||0)+floorsThisRun(r);
   for(const k of TYPES)P.taken[k]+=r.taken[k];P.killT+=r.avgKill*r.kills;P.lostFull+=r.lostFull||0;P.swapped+=r.swapped||0;
   I.runs.push({o:r.outcome==='died'?0:1,f:r.floor});I.lastLog=r.log.slice(-12);
   I.doneT+=r.tx+(I.rest||IDLE_REST);if(I.doneT>=I.dur)I.finished=true;
@@ -1871,12 +1873,13 @@ function startIdle(seed){
 }
 function collectIdle(){
   const I=S.idle;if(!I)return;const P=I.pool;S.idle=null;idlePending=null;
-  for(const k in P.mats)S.mats[k]=(S.mats[k]||0)+P.mats[k];
+  {const gb=guildBuffPct();for(const k in P.mats)S.mats[k]=(S.mats[k]||0)+Math.floor(P.mats[k]*(1+gb/100))}
   let sal=0;for(const it of P.items){if(S.inv.length<S.invCap)S.inv.push(it);else{const m=salvageMats(it);for(const k in m)S.mats[k]=(S.mats[k]||0)+m[k];sal++}}
   if(I.charmUsed)S.charm=null;
   S.runs+=P.runs;S.best=Math.max(S.best,P.deep);S.cleared=Math.max(S.cleared||0,P.cleared);for(const m of P.maps||[])if(S.maps.length<30)S.maps.push(m);for(const k in P.cur||{})S.cur[k]=(S.cur[k]||0)+P.cur[k];const ups=gainXP((P.xp||0)*(1+.1*(S.town.training||0)));S.bossKills=(S.bossKills||0)+(P.bosses||0);
   const rep={exp:true,dur:I.dur,recalled:!!I.recalled,runs:P.runs,deaths:P.deaths,escapes:P.escapes,floor:P.deep,kills:P.kills,mats:P.mats,items:P.items,salv:P.salv,fullSalv:sal,lost:P.lost,
     taken:P.taken,avgKill:P.kills?P.killT/P.kills:0,lostFull:P.lostFull,swapped:P.swapped,outcome:P.deaths?'died':'escaped',charmName:I.charmUsed?I.charm.n:null,history:I.runs.slice(-40),logTail:I.lastLog||[],mapsN:(P.maps||[]).length,xp:P.xp||0,bosses:P.bosses||0,levelUps:ups,newLvl:S.lvl};
+  try{guildWeekCount({cleared:1,startFloor:1});S.gw.n+=(P.fl||0)-1;clearTimeout(pushMember.t);pushMember.t=setTimeout(pushMember,1500)}catch(e){}
   S.report=rep;persist();snapNow();backupPrompt();empIntro();updTabDots();
   modal(I.recalled?'Runner recalled':'Expedition complete',expHTML(rep,computeStats(S.eq)),[{label:'Back to the workshop',fn:render}]);render();
 }
@@ -2215,6 +2218,136 @@ function frame(t){
 if(S.idle&&!S.idle.v){try{applyResult(S.idle.res,S.idle.charm)}catch(e){}S.idle=null;persist()}
 if(!S.welcomed){S.welcomed=1;persist();setTimeout(()=>modal('Welcome to Delvesmith',`<p style="margin:0 0 10px">Your <b>runner</b> dives into a dungeon on its own. It fights, mines and loots, and brings home materials and gear, if it survives.</p><p style="margin:0 0 10px">Your job is the <b>workshop</b>: refine materials into crafting currency, craft better gear, and decide how far the runner should push.</p><p style="margin:0">A short tutorial at the bottom of the screen will walk you through it. The <b>Guide</b> tab has everything else.</p>`,[{label:"Let's go"}]),300)}
 initLocalSafety();
+// ===================== SOCIAL: guilds + trading (Firebase, GitHub version) =====================
+const SOC={unsub:[],guild:null,members:[],chat:[],market:[],mine:[],pub:null,busy:false};
+const esc=t=>String(t==null?'':t).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+const PRICEK=[...Object.keys(CUR),...MKEYS];
+const pname=k=>CUR[k]?CUR[k].n:MATS[k]?MATS[k].n:k;
+const priceHTML=p=>(p&&p.length)?p.map(x=>`<span class="chip">${x.n} ${esc(pname(x.k))}</span>`).join(' '):'<span class="chip">Free</span>';
+const have=k=>CUR[k]?(S.cur[k]||0):(S.mats[k]||0);
+const canPay=p=>(p||[]).every(x=>have(x.k)>=x.n);
+const payPrice=(p,sign)=>{for(const x of p||[]){if(CUR[x.k])S.cur[x.k]=(S.cur[x.k]||0)+sign*x.n;else S.mats[x.k]=(S.mats[x.k]||0)+sign*x.n}};
+const myName=()=>(S.nick||(fbUser&&fbUser.displayName)||'Runner').slice(0,18);
+const goalFor=n=>Math.min(300,50+25*Math.max(0,n-1));
+function socOff(){for(const u of SOC.unsub)try{u()}catch(e){}SOC.unsub=[]}
+function floorsThisRun(res){return res.cleared&&res.cleared>=(res.startFloor||1)?res.cleared-(res.startFloor||1)+1:0}
+function guildWeekCount(res){const wk=weekId();if(!S.gw||S.gw.w!==wk){S.gwp=S.gw&&S.gw.w===wk-1?S.gw:S.gwp;S.gw={w:wk,n:0}}S.gw.n+=floorsThisRun(res)}
+async function pushMember(){if(!(USE_FB&&fbUser&&S.guild&&FB))return;const F=FB.F,wk=weekId();
+  try{await F.setDoc(F.doc(FB.db,'guilds',S.guild,'members',fbUser.uid),{uid:fbUser.uid,name:myName(),best:S.best||0,lvl:S.lvl||1,w:S.gw&&S.gw.w===wk?wk:wk,n:S.gw&&S.gw.w===wk?S.gw.n:0,pw:S.gwp?S.gwp.w:0,pn:S.gwp?S.gwp.n:0,at:Date.now()},{merge:true})}catch(e){}}
+function guildBuffPct(){return S.gbuff&&S.gbuff.w===weekId()?S.gbuff.pct:0}
+function computeGuildBuff(){const wk=weekId(),ms=SOC.members;if(!ms.length)return;
+  const last=ms.reduce((a,m)=>a+(m.w===wk-1?(m.n||0):m.pw===wk-1?(m.pn||0):0),0);
+  if(last>=goalFor(ms.length)){if(!S.gbuff||S.gbuff.w!==wk){S.gbuff={w:wk,pct:15};persist();toast('Your guild hit last week\'s goal: +15% materials this week!')}}}
+// ---------- view
+function viewSocial(){const t=S.socTab||'guild';
+  let h=`<h1>SOCIAL</h1><div class="chips" style="margin:0 0 12px;gap:6px">${[['guild','Guild'],['market','Market']].map(([k,n])=>`<button class="btn small ${t===k?'':'ghost'}" data-soc="${k}" style="width:auto;flex:1">${n}</button>`).join('')}</div>`;
+  if(!USE_FB){h+=`<div class="card"><div class="note">Guilds and trading run on the online version of Delvesmith. Open it from your GitHub link.</div></div>`;$('#view').innerHTML=h;bindSocTabs();return}
+  if(!fbUser){h+=`<div class="card"><h3>Sign in to play together</h3><div class="note" style="margin-bottom:8px">Guilds and the market need an account so your items and guild stay yours.</div><div class="btnrow"><button class="btn small" id="sG">Sign in with Google</button><button class="btn small ghost" id="sE">Use email</button></div></div>`;
+    $('#view').innerHTML=h;bindSocTabs();$('#sG').onclick=fbSignInGoogle;$('#sE').onclick=fbEmailModal;return}
+  h+='<div id="socBody"><div class="note">Loading…</div></div>';$('#view').innerHTML=h;bindSocTabs();
+  socOff();if(t==='guild')guildView();else marketView()}
+function bindSocTabs(){document.querySelectorAll('[data-soc]').forEach(b=>b.onclick=()=>{S.socTab=b.dataset.soc;persist();viewSocial()})}
+const SB=()=>document.getElementById('socBody');
+// ---------- guild
+async function guildView(){const F=FB.F;
+  if(!S.guild){renderNoGuild();try{const sn=await F.getDocs(F.query(F.collection(FB.db,'guilds'),F.where('public','==',true),F.limit(30)));SOC.pub=sn.docs.map(d=>({id:d.id,...d.data()}));renderNoGuild()}catch(e){SOC.pub=[];renderNoGuild()}return}
+  try{const g=await F.getDoc(F.doc(FB.db,'guilds',S.guild));if(!g.exists()){S.guild=null;persist();toast('That guild no longer exists');return guildView()}SOC.guild={id:g.id,...g.data()}}catch(e){if(SB())SB().innerHTML='<div class="note">Can\'t reach the guild right now.</div>';return}
+  const mine=SOC.guild;await pushMember();
+  SOC.unsub.push(F.onSnapshot(F.collection(FB.db,'guilds',mine.id,'members'),sn=>{SOC.members=sn.docs.map(d=>d.data());if(!SOC.members.some(m=>m.uid===fbUser.uid)&&SOC.members.length){S.guild=null;persist();toast('You are no longer in this guild');viewSocial();return}computeGuildBuff();renderGuild()},()=>{}));
+  SOC.unsub.push(F.onSnapshot(F.query(F.collection(FB.db,'guilds',mine.id,'chat'),F.orderBy('at','desc'),F.limit(40)),sn=>{SOC.chat=sn.docs.map(d=>({id:d.id,...d.data()})).reverse();renderGuild()},()=>{}));
+  SOC.unsub.push(F.onSnapshot(F.doc(FB.db,'guilds',mine.id),d=>{if(d.exists()){SOC.guild={id:d.id,...d.data()};renderGuild()}},()=>{}))}
+function renderNoGuild(){const b=SB();if(!b)return;
+  b.innerHTML=`<div class="card"><h3>Join a guild</h3><div class="note" style="margin-bottom:8px">Got a code from a friend? Enter it here.</div><div style="display:flex;gap:8px"><input id="gCode" placeholder="Guild code" maxlength="8" style="flex:1;text-transform:uppercase;background:#120f18;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:16px;min-width:0"><button class="btn small" id="gJoin" style="width:auto">Join</button></div></div>
+  <div class="card"><h3>Start a guild</h3><input id="gName" placeholder="Guild name" maxlength="24" style="width:100%;margin-bottom:8px;background:#120f18;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:16px">
+  <div class="set"><div>List publicly<small>Anyone can find and join it below</small></div><button class="toggle" id="gPub"></button></div><button class="btn" id="gMake" style="margin-top:8px">Create guild</button></div>
+  <div class="card"><h3>Public guilds</h3>${SOC.pub==null?'<div class="note">Loading…</div>':SOC.pub.length?SOC.pub.map(g=>`<div class="row" style="align-items:center"><div><b>${esc(g.name)}</b><div class="note">${g.count||1} member${(g.count||1)===1?'':'s'}</div></div><button class="btn small ghost" data-pj="${g.id}" style="width:auto">Join</button></div>`).join(''):'<div class="note">No public guilds yet. Start one!</div>'}</div>`;
+  let pub=false;$('#gPub').onclick=e=>{pub=!pub;e.target.classList.toggle('on',pub)};
+  $('#gMake').onclick=()=>createGuild($('#gName').value.trim(),pub);
+  $('#gJoin').onclick=()=>joinByCode($('#gCode').value.trim().toUpperCase());
+  document.querySelectorAll('[data-pj]').forEach(b=>b.onclick=()=>joinGuild(b.dataset.pj))}
+async function createGuild(name,pub){if(name.length<3){toast('Pick a name with at least 3 letters');return}const F=FB.F;
+  const code=Array.from({length:6},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random()*32)]).join('');
+  try{const ref=F.doc(F.collection(FB.db,'guilds'));await F.setDoc(ref,{name:name.slice(0,24),code,leader:fbUser.uid,public:!!pub,count:1,created:Date.now()});
+    S.guild=ref.id;persist();await pushMember();toast('Guild created! Share the code '+code);viewSocial()}catch(e){toast('Couldn\'t create the guild ('+((e&&e.code)||'error')+')')}}
+async function joinByCode(code){if(code.length<4){toast('Enter the guild code');return}const F=FB.F;
+  try{const sn=await F.getDocs(F.query(F.collection(FB.db,'guilds'),F.where('code','==',code),F.limit(1)));if(sn.empty){toast('No guild with that code');return}joinGuild(sn.docs[0].id)}catch(e){toast('Couldn\'t look up that code')}}
+async function joinGuild(id){const F=FB.F;S.guild=id;persist();await pushMember();try{const g=await F.getDoc(F.doc(FB.db,'guilds',id));const ms=await F.getDocs(F.collection(FB.db,'guilds',id,'members'));if(g.exists()&&g.data().leader===fbUser.uid)await F.updateDoc(F.doc(FB.db,'guilds',id),{count:ms.size})}catch(e){}toast('Joined the guild!');viewSocial()}
+async function leaveGuild(){const F=FB.F,g=SOC.guild;if(!g)return;
+  modal('Leave guild?',g.leader===fbUser.uid&&SOC.members.length>1?'You\'re the leader, so leadership passes to the longest-standing member.':g.leader===fbUser.uid?'You\'re the last member, so the guild will be deleted.':'You can rejoin later with the code.',[{label:'Leave',cls:'danger',fn:async()=>{
+    try{const others=SOC.members.filter(m=>m.uid!==fbUser.uid).sort((a,b)=>(a.at||0)-(b.at||0));
+      if(g.leader===fbUser.uid){if(others.length)await F.updateDoc(F.doc(FB.db,'guilds',g.id),{leader:others[0].uid,count:others.length});}
+      await F.deleteDoc(F.doc(FB.db,'guilds',g.id,'members',fbUser.uid));
+      if(g.leader===fbUser.uid&&!others.length)await F.deleteDoc(F.doc(FB.db,'guilds',g.id))}catch(e){}
+    socOff();S.guild=null;SOC.guild=null;SOC.members=[];persist();toast('You left the guild');viewSocial()}},{label:'Cancel',cls:'ghost'}])}
+async function kick(uid){const F=FB.F,g=SOC.guild;try{await F.deleteDoc(F.doc(FB.db,'guilds',g.id,'members',uid));await F.updateDoc(F.doc(FB.db,'guilds',g.id),{count:Math.max(1,SOC.members.length-1)});toast('Removed')}catch(e){toast('Couldn\'t remove them')}}
+async function sendChat(){const i=$('#gMsg');if(!i)return;const t=i.value.trim().slice(0,200);if(!t)return;i.value='';const F=FB.F;
+  try{await F.addDoc(F.collection(FB.db,'guilds',SOC.guild.id,'chat'),{uid:fbUser.uid,name:myName(),text:t,at:Date.now()})}catch(e){toast('Message didn\'t send')}}
+function renderGuild(){const b=SB(),g=SOC.guild;if(!b||!g||S.tab!=='social'||(S.socTab||'guild')!=='guild')return;
+  const keepMsg=$('#gMsg')?$('#gMsg').value:'',focused=document.activeElement&&document.activeElement.id==='gMsg';
+  const wk=weekId(),ms=[...SOC.members].sort((a,b)=>(b.best||0)-(a.best||0)),goal=goalFor(ms.length),done=ms.reduce((a,m)=>a+(m.w===wk?(m.n||0):0),0),isL=g.leader===fbUser.uid,buff=guildBuffPct();
+  b.innerHTML=`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">${esc(g.name)}</h3><span class="note">Code <b style="color:var(--ink);letter-spacing:1px" id="gCodeShow">${esc(g.code)}</b></span></div>
+    <div class="note" style="margin:10px 0 4px">WEEKLY GOAL · floors cleared by members</div>
+    <div style="height:12px;background:#120f18;border-radius:6px;overflow:hidden;border:1px solid var(--line)"><div style="height:100%;width:${Math.min(100,done/goal*100)}%;background:linear-gradient(90deg,#c8742a,#ffd36a)"></div></div>
+    <div class="note" style="margin-top:4px">${done} / ${goal} · reach it and everyone gets <b>+15% materials</b> next week${buff?` · <span style="color:#5dd68c">active now: +${buff}%</span>`:''}</div>
+    <div class="btnrow" style="margin-top:10px"><button class="btn small ghost" id="gCopy">Copy invite</button><button class="btn small ghost" id="gLeave">Leave</button></div></div>
+  <div class="card"><h3>Members · ${ms.length}</h3>${ms.map(m=>`<div class="row" style="align-items:center"><div><b>${m.uid===g.leader?'👑 ':''}${esc(m.name)}</b>${m.uid===fbUser.uid?' <small class="note">(you)</small>':''}<div class="note">Lv ${m.lvl||1} · deepest ${m.best||0} · ${m.w===wk?(m.n||0):0} floors this week</div></div>${isL&&m.uid!==fbUser.uid?`<button class="btn small ghost" data-kick="${esc(m.uid)}" style="width:auto">Kick</button>`:''}</div>`).join('')}</div>
+  <div class="card"><h3>Guild chat</h3><div id="gChat" style="max-height:260px;overflow:auto;margin-bottom:8px">${SOC.chat.length?SOC.chat.map(c=>`<div style="margin:4px 0"><b style="color:${c.uid===fbUser.uid?'var(--accent)':'#c9c1d6'}">${esc(c.name)}</b> <span>${esc(c.text)}</span></div>`).join(''):'<div class="note">No messages yet. Say hi!</div>'}</div>
+    <div style="display:flex;gap:8px"><input id="gMsg" maxlength="200" placeholder="Message" style="flex:1;background:#120f18;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:16px;min-width:0"><button class="btn small" id="gSend" style="width:auto">Send</button></div></div>`;
+  const ch=$('#gChat');if(ch)ch.scrollTop=ch.scrollHeight;const mi=$('#gMsg');mi.value=keepMsg;if(focused)mi.focus();
+  mi.onkeydown=e=>{if(e.key==='Enter')sendChat()};$('#gSend').onclick=sendChat;$('#gLeave').onclick=leaveGuild;
+  $('#gCopy').onclick=()=>{const t=`Join my Delvesmith guild "${g.name}" with code ${g.code}: ${location.href.split('#')[0]}`;try{navigator.clipboard.writeText(t);toast('Invite copied')}catch(e){toast('Code: '+g.code)}};
+  document.querySelectorAll('[data-kick]').forEach(x=>x.onclick=()=>modal('Kick member?','They can rejoin with the code unless you change guilds.',[{label:'Kick',cls:'danger',fn:()=>kick(x.dataset.kick)},{label:'Cancel',cls:'ghost'}]))}
+// ---------- market
+function marketView(){const F=FB.F;renderMarket();
+  SOC.unsub.push(F.onSnapshot(F.query(F.collection(FB.db,'trades'),F.where('status','==','open'),F.limit(80)),sn=>{SOC.market=sn.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.at||0)-(a.at||0));renderMarket()},()=>{}));
+  SOC.unsub.push(F.onSnapshot(F.query(F.collection(FB.db,'trades'),F.where('seller','==',fbUser.uid)),sn=>{SOC.mine=sn.docs.map(d=>({id:d.id,...d.data()})).filter(t=>t.seller===fbUser.uid);renderMarket();claimSales()},()=>{}))}
+function renderMarket(){const b=SB();if(!b||S.tab!=='social'||(S.socTab||'guild')!=='market')return;
+  const vis=SOC.market.filter(t=>t.seller!==fbUser.uid&&(!t.guildOnly||(S.guild&&t.guild===S.guild)));
+  const row=(t,mine)=>`<div class="slotrow" data-tr="${t.id}"><div style="flex:1;min-width:0"><div class="sl">${SLOTN[t.item.slot]||''} · ${mine?({open:'listed',sold:'sold, collecting…',cancelled:'cancelled'}[t.status]||t.status):'from '+esc(t.sellerName)}${t.guildOnly?' · guild only':''}</div><div class="nm r${t.item.rarity}">${esc(itemName(t.item))}</div><div class="meta">ilvl ${t.item.ilvl} · ${t.item.mods.length} mods</div><div style="margin-top:4px">${priceHTML(t.price)}</div></div><span class="note">›</span></div>`;
+  b.innerHTML=`<div class="card"><h3>Sell an item</h3><div class="note" style="margin-bottom:8px">List gear for currency or materials. It leaves your inventory while listed, and you're paid automatically when it sells. Cancel any time before then to get it back.</div><button class="btn" id="mSell">List an item</button></div>
+   ${SOC.mine.length?`<div class="card"><h3>Your listings</h3>${SOC.mine.map(t=>row(t,true)).join('')}</div>`:''}
+   <div class="card"><h3>For sale · ${vis.length}</h3>${vis.length?vis.map(t=>row(t,false)).join(''):'<div class="note">Nothing listed yet.</div>'}</div>`;
+  $('#mSell').onclick=sellPicker;
+  document.querySelectorAll('[data-tr]').forEach(e=>e.onclick=()=>{const id=e.dataset.tr,t=SOC.market.find(x=>x.id===id)||SOC.mine.find(x=>x.id===id);if(t)tradeModal(t)})}
+function sellPicker(){const its=S.inv.filter(i=>!i.fav);if(!its.length){toast('No items to sell (favorites are protected)');return}
+  modal('Pick an item to sell',its.map(i=>`<div class="slotrow" data-si="${i.uid}"><div><div class="sl">${SLOTN[i.slot]}</div><div class="nm r${i.rarity}">${esc(itemName(i))}</div><div class="meta">ilvl ${i.ilvl} · ${i.mods.length} mods</div></div></div>`).join(''),[{label:'Cancel',cls:'ghost'}]);
+  document.querySelectorAll('[data-si]').forEach(e=>e.onclick=()=>{const it=S.inv.find(i=>i.uid===+e.dataset.si);$('#modal').classList.add('hidden');paused=false;priceForm(it)})}
+function priceForm(it){const opt=sel=>PRICEK.map(k=>`<option value="${k}" ${k===sel?'selected':''}>${esc(pname(k))}</option>`).join('');
+  const inp='background:#120f18;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:16px;min-width:0';
+  modal('Set your price',itemHTML(it)+`<div class="note" style="margin:10px 0 6px">PRICE (leave amount at 0 to skip a line; both 0 = free gift)</div>
+    <div style="display:flex;gap:8px;margin-bottom:6px"><select id="pk1" style="flex:2">${opt('chaos')}</select><input id="pn1" type="number" min="0" value="1" style="flex:1;${inp}"></div>
+    <div style="display:flex;gap:8px"><select id="pk2" style="flex:2">${opt('crystal')}</select><input id="pn2" type="number" min="0" value="0" style="flex:1;${inp}"></div>
+    ${S.guild?`<div class="set" style="margin-top:8px"><div>Guild members only</div><button class="toggle" id="pGo"></button></div>`:''}`,
+    [{label:'List it',fn:()=>{}},{label:'Cancel',cls:'ghost'}]);
+  let go=false;const gb=$('#pGo');if(gb)gb.onclick=()=>{go=!go;gb.classList.toggle('on',go)};
+  const btn=document.querySelector('#mBtns .btn');btn.onclick=async()=>{const p=[];for(const i of [1,2]){const k=$('#pk'+i).value,n=Math.max(0,Math.min(9999,Math.floor(+$('#pn'+i).value||0)));if(n>0){const ex=p.find(x=>x.k===k);if(ex)ex.n+=n;else p.push({k,n})}}
+    $('#modal').classList.add('hidden');paused=false;await listItem(it,p,go)}}
+async function listItem(it,price,guildOnly){const F=FB.F;if(!S.inv.includes(it)){toast('That item is gone');return}
+  S.inv=S.inv.filter(i=>i!==it);persist();
+  try{await F.addDoc(F.collection(FB.db,'trades'),{seller:fbUser.uid,sellerName:myName(),item:JSON.parse(JSON.stringify(it)),price,status:'open',guild:S.guild||null,guildOnly:!!guildOnly,at:Date.now()});toast('Listed!')}
+  catch(e){S.inv.push(it);persist();toast('Couldn\'t list it ('+((e&&e.code)||'error')+'). Item returned.')}}
+function tradeModal(t){const mine=t.seller===fbUser.uid,ok=canPay(t.price);
+  const btns=mine?(t.status==='open'?[{label:'Cancel listing (get item back)',cls:'danger',fn:()=>cancelListing(t)},{label:'Close',cls:'ghost'}]:[{label:'Close',cls:'ghost'}])
+    :[{label:ok?'Buy':'Can\'t afford',disabled:!ok,fn:()=>buy(t)},{label:'Close',cls:'ghost'}];
+  modal(mine?'Your listing':'Buy from '+esc(t.sellerName),itemHTML(t.item)+`<div style="margin-top:10px"><b>Price:</b> ${priceHTML(t.price)}</div>${!mine&&!ok?'<div class="note" style="margin-top:6px;color:#ff9a7a">You don\'t have enough.</div>':''}`,btns)}
+async function buy(t){const F=FB.F;if(!canPay(t.price)){toast('Not enough to pay');return}if(S.inv.length>=S.invCap){toast('Inventory full: make room first');return}
+  const ref=F.doc(FB.db,'trades',t.id);
+  try{await F.runTransaction(FB.db,async tx=>{const d=await tx.get(ref);if(!d.exists()||d.data().status!=='open')throw{code:'gone'};tx.update(ref,{status:'sold',buyer:fbUser.uid,buyerName:myName(),soldAt:Date.now()})});
+    payPrice(t.price,-1);const it=JSON.parse(JSON.stringify(t.item));it.uid=++S.uid;it.fav=false;S.inv.push(it);persist();toast('Bought '+itemName(it)+'!');render()}
+  catch(e){toast(e&&e.code==='gone'?'Someone else bought it first':'Purchase failed ('+((e&&e.code)||'error')+')')}}
+async function cancelListing(t){const F=FB.F,ref=F.doc(FB.db,'trades',t.id);
+  try{let back=null;await F.runTransaction(FB.db,async tx=>{const d=await tx.get(ref);if(!d.exists()||d.data().status!=='open')throw{code:'gone'};tx.update(ref,{status:'cancelled'});back=d.data().item});
+    const it=back;it.uid=++S.uid;S.inv.push(it);persist();try{await F.deleteDoc(ref)}catch(e){}toast('Listing cancelled, item returned');render()}
+  catch(e){toast(e&&e.code==='gone'?'Too late: it already sold':'Couldn\'t cancel ('+((e&&e.code)||'error')+')')}}
+let claiming=false;
+async function claimSales(){if(claiming||!(FB&&fbUser))return;claiming=true;const F=FB.F;S.claimed=S.claimed||[];
+  try{let mine=SOC.mine;if(!mine||!mine.length){const sn=await F.getDocs(F.query(F.collection(FB.db,'trades'),F.where('seller','==',fbUser.uid)));mine=sn.docs.map(d=>({id:d.id,...d.data()}))}
+    mine=mine.filter(t=>t.seller===fbUser.uid);for(const t of mine){if(t.status!=='sold')continue;if(S.claimed.includes(t.id)){try{await F.deleteDoc(F.doc(FB.db,'trades',t.id))}catch(e){}continue}
+      payPrice(t.price,+1);S.claimed.push(t.id);S.claimed=S.claimed.slice(-200);persist();
+      toast(`Sold ${itemName(t.item)} to ${t.buyerName||'someone'}!`);try{await F.updateDoc(F.doc(FB.db,'trades',t.id),{status:'claimed'});await F.deleteDoc(F.doc(FB.db,'trades',t.id))}catch(e){}}
+    for(const t of mine)if(t.status==='cancelled'||t.status==='claimed'){try{await F.deleteDoc(F.doc(FB.db,'trades',t.id))}catch(e){}}}catch(e){}
+  claiming=false}
+
 updTabDots();
 window.__ds={idleRot,idleSet,localStats,empIntro,abyssMods,salv:salvageMats,Sim,computeStats,genItem,weekMods,mkUnique,mkMap,get S(){return S},get sim(){return sim},rollMod,simIdleRun,get pend(){return idlePending}};setTab(S.tab||'run');resize();initCloud();requestAnimationFrame(frame);
 })();
