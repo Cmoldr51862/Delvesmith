@@ -233,15 +233,15 @@ function mkBoss(b,floor,cx,cy,room){
   return{type:'boss',boss:true,bk:b,name:BOSSN[b],room,x:cx-24,y:cy-22,w:48,h:44,hx:cx,hy:cy,vx:0,vy:0,dir:1,speed:42,hp,max:hp,dmg,iv:1.8,cd:1,wind:0,hurt:0,kb:0,t:0,think:0,aggro:false,ac:Object.fromEntries(BOSSKIT[b].map((a,i)=>[a.k,2+i*1.5])),gcd:0,enr:false};
 }
 const TREE=[
-  {id:'m1',b:0,r:0,x:0,n:'Brute Force',max:3,st:{attackDmg:5}},
+  {id:'m1',b:0,r:0,x:0,n:'Brute Force',max:3,st:{attackDmg:7}},
   {id:'m2',b:0,r:1,x:0,n:'Quick Strikes',max:3,st:{incAps:3},req:['m1']},
   {id:'m3a',b:0,r:2,x:-1,n:'Precision',max:3,st:{incCrit:8},req:['m2']},
-  {id:'m3b',b:0,r:2,x:1,n:'Power',max:3,st:{attackDmg:5},req:['m2']},
-  {id:'m4',b:0,r:3,x:0,n:'Berserker',max:1,kind:'notable',st:{berserk:1},req:['m3a','m3b'],d:'+20% attack speed while below 50% Life.'},
-  {id:'m5',b:0,r:4,x:0,n:'Technique',max:3,st:{skillDmg:8},req:['m4']},
+  {id:'m3b',b:0,r:2,x:1,n:'Power',max:3,st:{attackDmg:7},req:['m2']},
+  {id:'m4',b:0,r:3,x:0,n:'Bloodlust',max:1,kind:'notable',st:{bloodlust:1},req:['m3a','m3b'],d:'Each kill gives +5% attack speed for 4 seconds, stacking up to 5 times (+25%). New kills refresh the timer.'},
+  {id:'m5',b:0,r:4,x:0,n:'Technique',max:3,st:{skillDmg:10},req:['m4']},
   {id:'m6a',b:0,r:5,x:-1,n:'Lethality',max:3,st:{critMulti:10},req:['m5']},
   {id:'m6b',b:0,r:5,x:1,n:'Fury',max:3,st:{incAps:3},req:['m5']},
-  {id:'m7',b:0,r:6,x:0,n:'Executioner',max:1,kind:'key',st:{execute:1},req:['m6a','m6b'],d:'+50% damage against enemies below 30% Life.'},
+  {id:'m7',b:0,r:6,x:0,n:'Executioner',max:1,kind:'key',st:{execute:1,attackDmg:30},req:['m6a','m6b'],d:'+30% attack damage and +50% damage against enemies below 35% Life, but 10% less Armour.'},
   {id:'s1',b:3,r:0,x:0,n:'Arcane Focus',max:3,st:{spellDmg:6}},
   {id:'s2',b:3,r:1,x:0,n:'Channeling',max:3,st:{castSpd:4},req:['s1']},
   {id:'s3a',b:3,r:2,x:-1,n:'Elementalist',max:3,st:{eleDmg:8},req:['s2']},
@@ -692,7 +692,7 @@ function localStats(it){
   return o;
 }
 function computeStats(eq){
-  const s={incDmg:0,skillDmg:0,treeArmour:0,allRes:0,cdr:0,berserk:0,secondWind:0,execute:0,unbreak:0,treasure:0,dodge:0,life:80,armour:0,incArmour:0,addPhys:0,incPhys:0,addFire:0,addCold:0,addPoison:0,incAps:0,incCrit:0,critMulti:150,fireRes:0,coldRes:0,poisonRes:0,regen:0,lifeOnHit:0,lootFind:0,ms:0,bagCap:0};
+  const s={incDmg:0,skillDmg:0,treeArmour:0,allRes:0,cdr:0,berserk:0,bloodlust:0,secondWind:0,execute:0,unbreak:0,treasure:0,dodge:0,life:80,armour:0,incArmour:0,addPhys:0,incPhys:0,addFire:0,addCold:0,addPoison:0,incAps:0,incCrit:0,critMulti:150,fireRes:0,coldRes:0,poisonRes:0,regen:0,lifeOnHit:0,lootFind:0,ms:0,bagCap:0};
   let w=null;
   for(const sl of EQ){const it=eq[sl];if(!it)continue;const b=BASES[it.base],L=localStats(it);
     if(L.armour)s.armour+=L.armour;
@@ -703,12 +703,13 @@ function computeStats(eq){
   for(const n of TREE){if(n.cls&&n.cls!==wclass)continue;const r=(S.tree&&S.tree[n.id])||0;if(r)for(const k in n.st)s[k]=(s[k]||0)+n.st[k]*r}
   if(wclass==='staff'){s.spellDmg=(s.spellDmg||0)+(s.clsDmg||0);s.incAps+=(s.castSpd||0)}else s.attackDmg=(s.attackDmg||0)+(s.clsDmg||0);
   if(!w)w={min:2,max:4,aps:1.2,crit:5};
-  const o={wclass,u:Object.fromEntries(EQ.map(k=>eq[k]).filter(i=>i&&i.uq).map(i=>[UNIQ[i.uq].fx,1])),m:Object.fromEntries(Object.keys(s).filter(k=>k.startsWith('mod_')&&s[k]).map(k=>[k.slice(4),1])),attackDmg:s.attackDmg||0,spellDmg:s.spellDmg||0,eleDmg:s.eleDmg||0,rangeInc:s.rangeInc||0,areaInc:s.areaInc||0,surge:s.surge||0,archmage:s.archmage||0,skillDmg:s.skillDmg,cdr:s.cdr,berserk:s.berserk,secondWind:s.secondWind,execute:s.execute,unbreak:s.unbreak,treasure:s.treasure,life:Math.round(s.life),armour:Math.round(s.armour*(1+s.treeArmour/100)),wmin:w.min,wmax:w.max,aps:Math.round(w.aps*(1+s.incAps/100)*100)/100,
+  const o={wclass,u:Object.fromEntries(EQ.map(k=>eq[k]).filter(i=>i&&i.uq).map(i=>[UNIQ[i.uq].fx,1])),m:Object.fromEntries(Object.keys(s).filter(k=>k.startsWith('mod_')&&s[k]).map(k=>[k.slice(4),1])),attackDmg:s.attackDmg||0,spellDmg:s.spellDmg||0,eleDmg:s.eleDmg||0,rangeInc:s.rangeInc||0,areaInc:s.areaInc||0,surge:s.surge||0,archmage:s.archmage||0,skillDmg:s.skillDmg,cdr:s.cdr,berserk:s.berserk,bloodlust:s.bloodlust,secondWind:s.secondWind,execute:s.execute,unbreak:s.unbreak,treasure:s.treasure,life:Math.round(s.life),armour:Math.round(s.armour*(1+s.treeArmour/100)),wmin:w.min,wmax:w.max,aps:Math.round(w.aps*(1+s.incAps/100)*100)/100,
     crit:Math.round(w.crit*(1+s.incCrit/100)*10)/10,critMulti:s.critMulti,addPhys:s.addPhys,incPhys:s.incPhys,addFire:s.addFire,addCold:s.addCold,addPoison:s.addPoison,
     res:{phys:0,fire:Math.min(75,s.fireRes+s.allRes),cold:Math.min(75,s.coldRes+s.allRes),poison:Math.min(75,s.poisonRes+s.allRes)},resRaw:{fire:s.fireRes+s.allRes,cold:s.coldRes+s.allRes,poison:s.poisonRes+s.allRes},regen:Math.round(s.regen*10)/10,lifeOnHit:s.lifeOnHit,
     lootFind:s.lootFind,ms:s.ms,speed:150*(1+s.ms/100),bag:Math.floor(25+s.bagCap),dodge:Math.min(80,s.dodge)};
   const phys=((o.wmin+o.wmax)/2+o.addPhys)*(1+o.incPhys/100),ele=o.addFire+o.addCold+o.addPoison,cf=1+Math.min(1,o.crit/100)*(o.critMulti/100-1);
   if(o.archmage)o.life=Math.round(o.life*.8);
+  if(o.execute)o.armour=Math.round(o.armour*.9);
   const pr=S.prestige||0;if(pr){o.life=Math.round(o.life*(1+.03*pr));o.attackDmg+=3*pr;o.spellDmg+=3*pr}
   const im=1+(wclass==='staff'?o.spellDmg:o.attackDmg)/100,em=1+o.eleDmg/100;o.dps=Math.round((phys+ele*em)*o.aps*cf*im*10)/10;o.physDps=phys*o.aps*cf*im;o.ele={fire:o.addFire,cold:o.addCold,poison:o.addPoison};
   return o;
@@ -1032,7 +1033,7 @@ class Sim{
     this.fx(this.P.x+this.P.w/2,this.P.y-4,'-'+Math.round(tot),TCOL[parts[0][0]]);
     if(this.life<=0){this.life=0;this.deathCause=`${src} hit for ${Math.round(tot)} (`+parts.map(p=>`${Math.round(p[1])} ${TNAME[p[0]].toLowerCase()}`).join(', ')+')';this.logm('Killed by '+this.deathCause,'#ff6b6b');this.finish('died')}
   }
-  hitEnemy(e,mult,forceCrit,quiet){const isSk=mult!=null&&!quiet,SP=isSk?this.curSpec:null,m0=mult;if(SP==='power')mult*=1.5;if(SP==='execute'&&e.hp<e.max*.35)mult*=2;mult=(mult||1)*(this.buff.cry>0?1.4:1)*(1+((this.st.wclass==='staff'?this.st.spellDmg:this.st.attackDmg)||0)/100)*(this.st.m&&this.st.m.choke&&this.buff.smoke>0?1.2:1)*(isSk?1+(this.st.skillDmg||0)/100:1)*(this.st.execute&&e.hp<e.max*.3?1.5:1);
+  hitEnemy(e,mult,forceCrit,quiet){const isSk=mult!=null&&!quiet,SP=isSk?this.curSpec:null,m0=mult;if(SP==='power')mult*=1.5;if(SP==='execute'&&e.hp<e.max*.35)mult*=2;mult=(mult||1)*(this.buff.cry>0?1.4:1)*(1+((this.st.wclass==='staff'?this.st.spellDmg:this.st.attackDmg)||0)/100)*(this.st.m&&this.st.m.choke&&this.buff.smoke>0?1.2:1)*(isSk?1+(this.st.skillDmg||0)/100:1)*(this.st.execute&&e.hp<e.max*.35?1.5:1);
     const st=this.st,B=BIOMES[this.L.b],r=()=>.75+this.rng()*.5;
     const d={phys:(st.wmin+this.rng()*(st.wmax-st.wmin)+st.addPhys*r())*(1+st.incPhys/100),fire:st.addFire*r()*(1+(st.eleDmg||0)/100),cold:st.addCold*r()*(1+(st.eleDmg||0)/100),poison:st.addPoison*r()*(1+(st.eleDmg||0)/100)};
     const crit=forceCrit||this.rng()<st.crit/100,cm=crit?st.critMulti/100:1;let tot=0;
@@ -1049,7 +1050,7 @@ class Sim{
     if(U.tremor&&!isSk&&this.rng()<.2){const ex2=e.x+e.w/2,ey2=e.y+e.h/2;this.ev.push({at:this.t+.05,f:()=>this.aoe(ex2,ey2,60,.8,null,'#d8c8a8')})}
     this.fx(e.x+e.w/2,e.y-4,Math.round(tot)+(crit?'!':''),crit?'#ffd84a':'#ffffff');this.pfx(e.x+e.w/2,e.y+e.h/2,B.enemy,5);
     if(e.hp<=0){
-      this.kills++;this.killTimes.push(this.t-e.engT);const x=e.x+e.w/2,y=e.y;
+      this.kills++;if(this.st.bloodlust){if(this.t>(this.bloodT||0))this.blood=0;this.blood=Math.min(5,(this.blood||0)+1);this.bloodT=this.t+4}this.killTimes.push(this.t-e.engT);const x=e.x+e.w/2,y=e.y;
       if(st.u&&st.u.gelheart)this.life=Math.min(st.life,this.life+st.life*.08);
       this.xp=(this.xp||0)+(e.boss?30:e.champ?5:e.type==='bat'?.6:1)*this.floor*(1+(this.L.lootQ||0)/200);
       if(this.L.modset&&this.L.modset.volatile&&!e.boss){this.pud=(this.pud||0)+1;this.L.puddles.push({x,y:e.y+e.h/2,r:48,warn:.7,w0:.7,life:0,tick:0,dmg:e.dmg,name:'Volatile explosion',blast:1,seen:this.roll(77,this.pud)*100<(this.st.dodge||0)})}
@@ -1130,7 +1131,7 @@ class Sim{
       if(rectSolid(L,tx-9,ty-9,18,18)||s.dangerAt(tx,ty)||!los(L,pcx,pcy,tx,ty,8))continue;let sc=-R+Math.hypot(tx-dz.x,ty-dz.y)*.3;if(goal)sc-=Math.hypot(tx-goal.x,ty-goal.y)*.05;if(sc>bs){bs=sc;dodge={x:tx,y:ty}}}if(dodge)break}
       if(dodge){atkE=null;atkN=null}}}
     if((atkE||atkN)&&p.atkCd<=0&&!(p.channel>0)&&!p.dash){
-      p.atkCd=1/(st.aps*(st.berserk&&s.life<st.life*.5?1.2:1));p.swing=p.swingMax=wc.swing;p.alt=!p.alt;
+      p.atkCd=1/(st.aps*(st.berserk&&s.life<st.life*.5?1.2:1)*(st.bloodlust&&s.t<(s.bloodT||0)?1+.05*(s.blood||0):1));p.swing=p.swingMax=wc.swing;p.alt=!p.alt;
       if(atkE){const dd=Math.hypot(atkE.x+atkE.w/2-pcx,atkE.y+atkE.h/2-pcy);if(wc.range&&dd>p.w/2+Math.max(atkE.w,atkE.h)/2+wc.reach+4){s.shoot(wc.range&&s.st.wclass==='bow'?'arrow':'bolt',p.ang,null);if(st.surge&&st.wclass==='staff'&&(s.surgeN=(s.surgeN||0)+1)%4===0){s.shoot('bolt',p.ang-.25,null);s.shoot('bolt',p.ang+.25,null)}}else s.hitEnemy(atkE)}
       else{atkN.hp--;atkN.hurt=.12;s.pfx(atkN.x+14,atkN.y+12,'#8d8076',6);
         if(atkN.hp<=0){s.pfx(atkN.x+14,atkN.y+12,B.ore,14,160);s.mats(B.oreMat(s.rng()),2,atkN.x+14,atkN.y)}}
