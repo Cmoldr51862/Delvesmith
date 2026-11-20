@@ -331,7 +331,8 @@ const SFX=(()=>{let ac=null,master=null,nb=null;const last={},q=[];
   const on=()=>S&&S.set&&S.set.sound!==false,vol=()=>S&&S.set&&S.set.vol!=null?S.set.vol:.6;
   function ctx(){if(!ac){const A=window.AudioContext||window.webkitAudioContext;if(!A)return null;ac=new A();master=ac.createGain();master.connect(ac.destination);
     nb=ac.createBuffer(1,ac.sampleRate*.6,ac.sampleRate);const d=nb.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1}
-    if(ac.state==='suspended')ac.resume();return ac}
+    if(ac.state!=='running')try{ac.resume().catch(()=>{})}catch(e){}return ac}
+  function revive(){if(!ac||!on())return;if(ac.state==='running')return;try{ac.resume().catch(()=>{})}catch(e){}setTimeout(()=>{if(ac&&ac.state!=='running'){try{ac.close()}catch(e){}ac=null;master=null;nb=null;for(const k in last)delete last[k]}},250)}
   function env(g,t,a,v,dur){g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(v,t+a);g.gain.exponentialRampToValueAtTime(0.0001,t+dur)}
   function tone(f,dur,type,v,f2,delay){const t=ac.currentTime+(delay||0),o=ac.createOscillator(),g=ac.createGain();o.type=type||'square';o.frequency.setValueAtTime(f,t);if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+dur);env(g,t,.005,v,dur);o.connect(g);g.connect(master);o.start(t);o.stop(t+dur+.02)}
   function noise(dur,ft,ff,v,ff2,delay){const t=ac.currentTime+(delay||0),src=ac.createBufferSource(),f=ac.createBiquadFilter(),g=ac.createGain();src.buffer=nb;f.type=ft;f.frequency.setValueAtTime(ff,t);if(ff2)f.frequency.exponentialRampToValueAtTime(ff2,t+dur);env(g,t,.004,v,dur);src.connect(f);f.connect(g);g.connect(master);src.start(t);src.stop(t+dur+.02)}
@@ -361,8 +362,9 @@ const SFX=(()=>{let ac=null,master=null,nb=null;const last={},q=[];
     click:()=>tone(1000,.03,'square',.04)};
   const GAP={hit:.06,crit:.08,swing:.08,arrow:.07,bolt:.07,kill:.07,hurt:.12,mine:.08,pickup:.08,boom:.1,trap:.15,fire:.1,frost:.1,toxic:.1};
   return{play(n){if(!on()||!P[n])return;const c=ctx();if(!c)return;const t=c.currentTime;if(last[n]!=null&&t-last[n]<(GAP[n]||.03))return;last[n]=t;master.gain.value=vol();try{P[n]()}catch(e){}},
-    unlock(){if(on())ctx()},q,flush(){let k=0;while(q.length&&k++<6)this.play(q.shift());q.length=0}}})();
-document.addEventListener('pointerdown',()=>SFX.unlock(),{passive:true});
+    unlock(){if(!on())return;if(ac&&ac.state!=='running'){try{ac.close()}catch(e){}ac=null;for(const k in last)delete last[k]}ctx()},revive,q,flush(){let k=0;while(q.length&&k++<6)this.play(q.shift());q.length=0}}})();
+document.addEventListener('pointerdown',()=>SFX.unlock(),{passive:true});document.addEventListener('touchend',()=>SFX.unlock(),{passive:true});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)SFX.revive()});window.addEventListener('pageshow',()=>SFX.revive());
 const DOTC={B:'#ff5a5a',P:'#8fe36b',F:'#ffa040',C:'#9fdcff'};
 const SKN={fireball:{fire:'Fireball',cold:'Frost Bolt',poison:'Plague Bolt'},nova:{fire:'Fire Nova',cold:'Frost Nova',poison:'Toxic Nova'}};
 const SKD={fireball:{cold:'An icy orb that bursts for 200% in an area. Frost hits slow enemies.',poison:'A toxic orb that bursts for 200% in an area. Poison hits stack up to 5 times.'},
