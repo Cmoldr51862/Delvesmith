@@ -687,7 +687,7 @@ function computeStats(eq){
   const o={wclass,u:Object.fromEntries(EQ.map(k=>eq[k]).filter(i=>i&&i.uq).map(i=>[UNIQ[i.uq].fx,1])),m:Object.fromEntries(Object.keys(s).filter(k=>k.startsWith('mod_')&&s[k]).map(k=>[k.slice(4),1])),attackDmg:s.attackDmg||0,spellDmg:s.spellDmg||0,eleDmg:s.eleDmg||0,rangeInc:s.rangeInc||0,areaInc:s.areaInc||0,surge:s.surge||0,archmage:s.archmage||0,skillDmg:s.skillDmg,cdr:s.cdr,berserk:s.berserk,secondWind:s.secondWind,execute:s.execute,unbreak:s.unbreak,treasure:s.treasure,life:Math.round(s.life),armour:Math.round(s.armour*(1+s.treeArmour/100)),wmin:w.min,wmax:w.max,aps:Math.round(w.aps*(1+s.incAps/100)*100)/100,
     crit:Math.round(w.crit*(1+s.incCrit/100)*10)/10,critMulti:s.critMulti,addPhys:s.addPhys,incPhys:s.incPhys,addFire:s.addFire,addCold:s.addCold,addPoison:s.addPoison,
     res:{phys:0,fire:Math.min(75,s.fireRes+s.allRes),cold:Math.min(75,s.coldRes+s.allRes),poison:Math.min(75,s.poisonRes+s.allRes)},resRaw:{fire:s.fireRes+s.allRes,cold:s.coldRes+s.allRes,poison:s.poisonRes+s.allRes},regen:Math.round(s.regen*10)/10,lifeOnHit:s.lifeOnHit,
-    lootFind:s.lootFind,ms:s.ms,speed:150*(1+s.ms/100),bag:25+s.bagCap,dodge:Math.min(80,s.dodge)};
+    lootFind:s.lootFind,ms:s.ms,speed:150*(1+s.ms/100),bag:Math.floor(25+s.bagCap),dodge:Math.min(80,s.dodge)};
   const phys=((o.wmin+o.wmax)/2+o.addPhys)*(1+o.incPhys/100),ele=o.addFire+o.addCold+o.addPoison,cf=1+Math.min(1,o.crit/100)*(o.critMulti/100-1);
   if(o.archmage)o.life=Math.round(o.life*.8);
   const pr=S.prestige||0;if(pr){o.life=Math.round(o.life*(1+.03*pr));o.attackDmg+=3*pr;o.spellDmg+=3*pr}
@@ -791,7 +791,7 @@ function findPath(L,sx,sy,gx,gy){
     const prev=new Int32Array(N).fill(-1),q=new Int32Array(N);let h=0,t=0;prev[s]=s;q[t++]=s;
     while(h<t){const c=q[h++];if(c===g)break;const cx=c%W,cy=(c/W)|0;
       for(const[dx,dy]of[[1,0],[-1,0],[0,1],[0,-1]]){const nx=cx+dx,ny=cy+dy;if(nx<0||ny<0||nx>=W||ny>=L.H)continue;const n=ny*W+nx,tv=L.tiles[n];
-        if(tv===1||tv===6&&n!==g||(avoid&&tv===3&&n!==g)||prev[n]>=0)continue;prev[n]=c;q[t++]=n}}
+        if(tv===1||(avoid&&(tv===6||tv===3)&&n!==g)||prev[n]>=0)continue;prev[n]=c;q[t++]=n}}
     if(prev[g]>=0){const path=[];for(let c=g;c!==s;c=prev[c])path.push(c);return path.reverse()}
   }
   return null;
@@ -1085,6 +1085,10 @@ class Sim{
     if(dodge){const dx=dodge.x-pcx,dy=dodge.y-pcy,d=Math.hypot(dx,dy)||1;vx=dx/d*st.speed;vy=dy/d*st.speed;p.ang=Math.atan2(dy,dx)}
     else if(goal&&!atkE&&!atkN){
       const gtx=Math.floor(goal.x/TS),gty=Math.floor(goal.y/TS),ptx=Math.floor(pcx/TS),pty=Math.floor(pcy/TS),gk=gtx*1000+gty;
+      {// stuck watchdog: no progress for 2s while travelling -> recenter on the current tile and re-path
+        const mv=Math.hypot(pcx-(p.lx==null?pcx:p.lx),pcy-(p.ly==null?pcy:p.ly));p.lx=pcx;p.ly=pcy;
+        if(mv<.15&&!p.hzW)p.stk=(p.stk||0)+dt;else p.stk=0;
+        if(p.stk>2){p.stk=0;p.path=null;p.goalKey=-1;if(L.tiles[pty*L.W+ptx]!==1){p.x=(ptx+.5)*TS-p.w/2;p.y=(pty+.5)*TS-p.h/2}}}
       if(p.goalKey!==gk||p.repath<=0||!p.path){p.path=(ptx===gtx&&pty===gty)?[]:findPath(L,ptx,pty,gtx,gty);p.goalKey=gk;p.repath=1.2}
       let wx=goal.x,wy=goal.y;
       if(p.path&&p.path.length){
@@ -1093,10 +1097,10 @@ class Sim{
         if(Math.hypot(wx-pcx,wy-pcy)<6){p.path.shift();if(p.path.length){const m=p.path[0];wx=(m%L.W+.5)*TS;wy=(Math.floor(m/L.W)+.5)*TS}else{wx=goal.x;wy=goal.y}}
       }
       if(!s.dangerAt(pcx,pcy)&&s.dangerAt(wx,wy)&&Math.hypot(wx-pcx,wy-pcy)<1.6*TS){wx=pcx;wy=pcy}
-      {const ni=Math.floor(wy/TS)*L.W+Math.floor(wx/TS),ci=pty*L.W+ptx,nt=L.tiles[ni];
+      p.hzW=0;{const ni=Math.floor(wy/TS)*L.W+Math.floor(wx/TS),ci=pty*L.W+ptx,nt=L.tiles[ni];
         if((nt===2||nt===3)&&ni!==ci&&L.tiles[ci]!==2&&L.tiles[ci]!==3&&Math.hypot(wx-pcx,wy-pcy)<1.4*TS){
           if(p.hzTile!==ni){p.hzTile=ni;s.hzN=(s.hzN||0)+1;p.hzSmart=s.roll(53,s.hzN)*100<(st.dodge||0)*1.5}
-          if(p.hzSmart&&(s.hzOn(ni)||s.hzOn(ni,.45))&&s.state!=='retreat'){wx=pcx;wy=pcy;if(!p.hzMsg||p.hzMsg!==ni){p.hzMsg=ni;s.fx(p.x+9,p.y-14,'waiting…','#8fd3ff')}}}}
+          if(p.hzSmart&&(s.hzOn(ni)||s.hzOn(ni,.45))&&s.state!=='retreat'){wx=pcx;wy=pcy;p.hzW=1;if(!p.hzMsg||p.hzMsg!==ni){p.hzMsg=ni;s.fx(p.x+9,p.y-14,'waiting…','#8fd3ff')}}}}
       const dx=wx-pcx,dy=wy-pcy,d=Math.hypot(dx,dy);
       if(d>2){vx=dx/d*st.speed;vy=dy/d*st.speed;p.ang=Math.atan2(dy,dx);p.face=dx>=0?1:-1}
     }
