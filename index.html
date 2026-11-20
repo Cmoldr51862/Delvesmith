@@ -314,7 +314,10 @@ const ROMAN=['I','II','III','IV','V','VI','VII','VIII','IX','X'],CYCN=['','Elder
 const cycName=f=>{const c=cycOf(f);return c?' '+(ROMAN[c]||('T'+(c+1))):''};
 const bsplit=f=>{const B=BIOMES[biomeOf(f)].split;if(!cycOf(f))return B;const A=BIOMES[4].split,o={};for(const k of TYPES)o[k]=(B[k]||0)*.5+(A[k]||0)*.5;return o};
 const bname=f=>BIOMES[biomeOf(f)].name+cycName(f);
-const mHP=f=>25*Math.pow(1.15,f-1)*Math.pow(1.2,bidxOf(f)),mDMG=f=>6*Math.pow(1.12,f-1)*Math.pow(1.15,bidxOf(f));
+// Smooth difficulty: growth per floor starts steep and eases toward a steady rate (no biome jumps)
+const mkCurve=(a,b,c,t,T)=>{const C=[1,1],L=Math.log;return f=>{f=Math.max(1,Math.floor(f));while(C.length<=f){const i=C.length-1;C.push(C[i]*Math.exp(L(c)+(L(b)-L(c))*Math.exp(-(i-1)/T)+(L(a)-L(b))*Math.exp(-(i-1)/t)))}return C[f]}};
+const hpCurve=mkCurve(1.2,1.11,1.032,14,25),dmgCurve=mkCurve(1.14,1.082,1.024,14,25);
+const mHP=f=>25*hpCurve(f),mDMG=f=>6*dmgCurve(f);
 const ramp=(f,k)=>Math.pow(k,Math.max(0,f-10)),wHP=f=>25*Math.pow(1.17,f-1)*Math.pow(1.2,bidxOf(f))*ramp(f,1.09),wDMG=f=>6*Math.pow(1.13,f-1)*Math.pow(1.17,bidxOf(f))*ramp(f,1.07);
 const danger=f=>Math.round(mHP(f)/25*10)/10;
 const bstart=b=>b<=0?1:b*5;
@@ -497,7 +500,7 @@ const persist=()=>{if(staleTab)return;setTimeout(()=>{try{tutTick()}catch(e){}},
 function idbSave(js,force){clearTimeout(idbSave.t);if(!idbReady){idbSave.q=[js,force];return}idbSave.t=setTimeout(async()=>{try{await IDB.set('save',js);idbOK=true;
     if(force||Date.now()-lastSnapAt>10*60*1000){lastSnapAt=Date.now();let sn=(await IDB.get('snaps'))||[];sn.unshift({...saveSummary(S),js});sn=sn.slice(0,12);await IDB.set('snaps',sn)}}catch(e){idbOK=false}},force?0:400)}
 function backupPrompt(tries){tries=tries||0;clearTimeout(backupPrompt.t);
-  if(cloudState==='on')return;const since=S.runs-Math.max(S.backupRuns||0,S.backupSnooze||0);if(since<5)return;
+  if(cloudState==='on')return;if(USE_FB&&!fbUser&&!(S.flags||{}).signNag&&S.runs>=3){(S.flags=S.flags||{}).signNag=1;persist();if(mode==='town'&&$('#modal').classList.contains('hidden')){modal('Save to the cloud?','Sign in and your progress is saved online, so it survives cleared browser data and works on any device. It also puts you on the weekly leaderboard.',[{label:'Sign in with Google',fn:fbSignInGoogle},{label:'Use email',cls:'ghost',fn:fbEmailModal},{label:'Later',cls:'ghost'}]);return}}const since=S.runs-Math.max(S.backupRuns||0,S.backupSnooze||0);if(since<5)return;
   if(mode!=='town'||!$('#modal').classList.contains('hidden')){if(tries<120)backupPrompt.t=setTimeout(()=>backupPrompt(tries+1),1000);return}
   modal('Save a backup?',`It's been ${S.runs-(S.backupRuns||0)} runs since your last backup file${S.backupAt?'':' (you haven\'t saved one yet)'}. A backup file is kept outside the browser, so your progress survives cleared data, private tabs or a new phone.`,
     [{label:'Save backup file',fn:()=>backupFile()},{label:'Later',cls:'ghost',fn:()=>{S.backupSnooze=S.runs;persist()}}])}
@@ -527,11 +530,45 @@ async function cloudPush(){
   if(!cloudRef||cloudState!=='on')return;
   if(cloudBusy){cloudAgain=true;return}
   cloudBusy=true;
-  try{await cloudRef.set({json:JSON.stringify(S),at:S.savedAt||Date.now()})}
+  try{await cloudRef.set(USE_FB?{json:JSON.stringify(S),at:S.savedAt||Date.now(),best:S.best||0,name:(S.nick||'Runner').slice(0,18)}:{json:JSON.stringify(S),at:S.savedAt||Date.now()})}
   catch(e){const c=e&&e.code;if(c==='unavailable'){cloudAgain=true}else{cloudState='off';updSaveCard()}}
   cloudBusy=false;if(cloudAgain){cloudAgain=false;setTimeout(cloudPush,2000)}
 }
+// ===== Firebase (GitHub version): accounts, cloud saves, shared leaderboard
+const FBCFG={apiKey:"AIzaSyDW9AA4k7qe2JPWt7bn5J3Hw_5offwHuto",authDomain:"delvesmith-4c446.firebaseapp.com",projectId:"delvesmith-4c446",storageBucket:"delvesmith-4c446.firebasestorage.app",messagingSenderId:"113973369922",appId:"1:113973369922:web:67643f291b6ffbd087e1db"};
+const USE_FB=/^https?:$/.test(location.protocol)&&!/claude|anthropic|localhost|127\.0\.0\.1/.test(location.hostname);
+let FB=null,fbUser=null;
+async function fbLoad(){if(FB)return FB;const v='10.12.2',u=m=>`https://www.gstatic.com/firebasejs/${v}/firebase-${m}.js`;
+  const [A,Au,F]=await Promise.all([import(u('app')),import(u('auth')),import(u('firestore'))]);const app=A.initializeApp(FBCFG);
+  FB={Au,F,auth:Au.getAuth(app),db:F.getFirestore(app)};try{await Au.setPersistence(FB.auth,Au.browserLocalPersistence)}catch(e){}return FB}
+const fbDB={collection(p){const F=FB.F;const wrapQ=q=>({orderBy(f,d){return wrapQ(F.query(q,F.orderBy(f,d)))},limit(n){return wrapQ(F.query(q,F.limit(n)))},
+    async get(){const sn=await F.getDocs(q);return{docs:sn.docs.map(d=>({id:d.id,data:()=>d.data()}))}}});
+  return Object.assign(wrapQ(F.collection(FB.db,p)),{doc(id){const r=F.doc(FB.db,p,id);return{async get(){const sn=await F.getDoc(r);return{exists:sn.exists(),data:()=>sn.data()}},set(v){return F.setDoc(r,v)}}}})}};
+async function fbSync(user){fbUser=user;DB=fbDB;
+  if(!user){UID=null;cloudRef=null;cloudState='signedout';updSaveCard();lbState='idle';if(S.tab==='run')loadBoard();return}
+  UID=user.uid;cloudState='checking';updSaveCard();
+  if(!S.nick&&user.displayName){S.nick=user.displayName.split(' ')[0].slice(0,18)}
+  try{const ref=DB.collection('users').doc(user.uid);const snap=await Promise.race([ref.get(),new Promise(r=>setTimeout(()=>r('timeout'),12000))]);
+    if(snap==='timeout'){cloudState='error';return updSaveCard()}
+    const remote=snap.exists?snap.data():null;cloudRef=ref;
+    if(remote&&remote.json){let r=null;try{r=JSON.parse(remote.json)}catch(e){}
+      if(r&&r.eq&&progressScore(r)>progressScore(S)&&mode!=='live'){snapNow();S=r;migrate();myWriteT=0;try{localStorage.setItem(KEY+'_t','0')}catch(e){}persist();render();toast('Loaded your cloud save')}}
+    await ref.set({json:JSON.stringify(S),at:S.savedAt||Date.now(),best:S.best||0,name:(S.nick||'Runner').slice(0,18)});cloudState='on'}
+  catch(e){cloudState=(e&&e.code==='permission-denied')?'rules':'error'}
+  updSaveCard();lbState='idle';if(S.tab==='run')loadBoard()}
+async function fbSignInGoogle(){try{await fbLoad();const p=new FB.Au.GoogleAuthProvider();try{await FB.Au.signInWithPopup(FB.auth,p)}catch(e){if(e&&/popup|cancelled-popup|operation-not-supported/.test(e.code||'')){await FB.Au.signInWithRedirect(FB.auth,p)}else throw e}}catch(e){toast('Google sign-in failed: '+((e&&e.code)||'try email instead').replace('auth/',''))}}
+function fbEmailModal(){modal('Sign in with email',`<div class="note" style="margin-bottom:8px">Use any email and a password (6+ characters). New here? Tap <b>Create account</b>.</div>
+  <input id="fbEm" type="email" placeholder="Email" autocomplete="email" style="width:100%;margin-bottom:8px;background:#120f18;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:16px">
+  <input id="fbPw" type="password" placeholder="Password" autocomplete="current-password" style="width:100%;background:#120f18;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:16px">`,
+  [{label:'Sign in',fn:()=>fbEmail(false)},{label:'Create account',cls:'blue',fn:()=>fbEmail(true)},{label:'Forgot password',cls:'ghost',fn:()=>fbReset()},{label:'Cancel',cls:'ghost'}])}
+let fbEmV='',fbPwV='';document.addEventListener('input',e=>{if(e.target.id==='fbEm')fbEmV=e.target.value.trim();if(e.target.id==='fbPw')fbPwV=e.target.value});
+async function fbEmail(create){try{await fbLoad();if(create)await FB.Au.createUserWithEmailAndPassword(FB.auth,fbEmV,fbPwV);else await FB.Au.signInWithEmailAndPassword(FB.auth,fbEmV,fbPwV);toast('Signed in')}
+  catch(e){const c=((e&&e.code)||'').replace('auth/','');toast({'invalid-credential':'Wrong email or password','user-not-found':'No account with that email. Tap Create account','wrong-password':'Wrong password','email-already-in-use':'That email already has an account. Tap Sign in','weak-password':'Password needs 6+ characters','invalid-email':"That email doesn't look right"}[c]||('Sign-in failed: '+c))}}
+async function fbReset(){try{await fbLoad();await FB.Au.sendPasswordResetEmail(FB.auth,fbEmV);toast('Password reset email sent')}catch(e){toast('Enter your email first, then tap Forgot password')}}
+async function fbSignOut(){try{await cloudPush()}catch(e){}try{await FB.Au.signOut(FB.auth)}catch(e){}toast('Signed out. Progress stays on this device too')}
 async function initCloud(){
+  if(USE_FB){try{await fbLoad();try{await FB.Au.getRedirectResult(FB.auth)}catch(e){}FB.Au.onAuthStateChanged(FB.auth,u=>fbSync(u))}catch(e){cloudState='error';updSaveCard()}
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&cloudState==='on'){clearTimeout(cloudTimer);cloudPush()}});return}
   try{
     if(!(window.claude&&typeof window.claude.use==='function')){cloudState='off';return updSaveCard()}
     const [db,user]=await Promise.all([window.claude.use('db'),window.claude.use('user')]);
@@ -551,8 +588,11 @@ async function initCloud(){
   }catch(e){cloudState='off';updSaveCard()}
 }
 function localText(){return idbOK===false?'<span style="color:#ffd36a">Saving (1 copy)</span>':idbOK?`<span style="color:#5dd68c">Saving (2 copies)</span>${persisted?' · protected':''}`:'Saving…'}
-function updSaveCard(){const el=document.getElementById('cloudStat');if(el)el.innerHTML=cloudText();const l=document.getElementById('localStat');if(l)l.innerHTML=localText()}
-function cloudText(){return {checking:'Checking…',on:'<span style="color:#5dd68c">On</span>: syncs to your Claude account',off:'Not available on shared links, so save a backup file',error:"Can't reach it right now"}[cloudState]}
+function updSaveCard(){const el=document.getElementById('cloudStat');if(el)el.innerHTML=cloudText();const ab=document.getElementById('acctBox');if(ab){ab.innerHTML=acctButtons();bindAcct()}const l=document.getElementById('localStat');if(l)l.innerHTML=localText()}
+function cloudText(){if(USE_FB)return {checking:'Connecting…',on:`<span style="color:#5dd68c">On</span>: ${String((fbUser&&(fbUser.email||fbUser.displayName))||'signed in').replace(/[<>&]/g,'')}`,signedout:'Not signed in',rules:'<span style="color:#ffd36a">Server not set up yet</span>',error:"Can't reach it right now",off:'Off'}[cloudState]||'…';
+  return {checking:'Checking…',on:'<span style="color:#5dd68c">On</span>: syncs to your Claude account',off:'Not available on shared links, so save a backup file',error:"Can't reach it right now"}[cloudState]}
+function acctButtons(){if(!USE_FB)return '';return fbUser?`<div class="btnrow" style="margin-top:8px"><button class="btn small ghost" id="fbOut">Sign out</button></div>`:`<div class="note" style="margin:8px 0 6px">Sign in to save to the cloud, play on any device and join the weekly leaderboard.</div><div class="btnrow" style="margin-bottom:10px"><button class="btn small" id="fbG">Sign in with Google</button><button class="btn small ghost" id="fbE">Use email</button></div>`}
+function bindAcct(){const g=$('#fbG');if(g)g.onclick=fbSignInGoogle;const e=$('#fbE');if(e)e.onclick=fbEmailModal;const o=$('#fbOut');if(o)o.onclick=fbSignOut}
 const b64e=t=>btoa(unescape(encodeURIComponent(t))),b64d=t=>decodeURIComponent(escape(atob(t)));
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
 
@@ -607,7 +647,7 @@ function itemHTML(it,newMods){
   {const L=localStats(it),aug=(v,a)=>a?`<span class="r1"><b>${v}</b></span>`:v;
    if(b.min){h+=`<div class="iprop">Physical Damage: ${aug(L.min+'–'+L.max,L.physAug)}`;
      for(const t of ['fire','cold','poison'])if(L[t])h+=`<br>${TNAME[t]} Damage: <b style="color:${TCOL[t]}">${L[t][0]}–${L[t][1]}</b>`;
-     h+=`<br>Attacks per Second: ${aug(L.aps,L.apsAug)}<br>Critical Hit Chance: ${aug(L.crit+'%',L.critAug)}<br><span style="color:#a99fb8">Weapon DPS: ${L.dps}${(L.physAug||L.apsAug||L.fire||L.cold||L.poison)?` <small>(base ${Math.round((b.min+b.max)/2*b.aps*10)/10})</small>`:''}</span></div>`}
+     h+=`<br>Attacks per Second: ${aug(Math.round(L.aps*100)/100,L.apsAug)}<br>Critical Hit Chance: ${aug(Math.round(L.crit*10)/10+'%',L.critAug)}<br><span style="color:#a99fb8">Weapon DPS: ${Math.round(L.dps*10)/10}${(L.physAug||L.apsAug||L.fire||L.cold||L.poison)?` <small>(base ${Math.round((b.min+b.max)/2*b.aps*10)/10})</small>`:''}</span></div>`}
    if(L.armour&&(b.armour||L.armAug))h+=`<div class="iprop">Armour: ${aug(L.armour,L.armAug)}${L.armAug?` <small style="color:#a99fb8">(base ${(b.armour||0)+((b.imp&&b.imp.armour)||0)})</small>`:''}</div>`;}
   if(b.cls)h+=`<div class="note" style="margin-top:4px">Skills: ${WCLASS[b.cls].skills.map(k=>SKILLS[k].n).join(' · ')}</div>`;
   const em=1+.05*(it.emp||0),ev=v=>em===1?v:(Math.abs(v*em)>=10?Math.round(v*em):Math.round(v*em*10)/10),eb=em>1?` <small style="color:#ffb070">(+${Math.round((em-1)*100)}%)</small>`:'';
@@ -646,7 +686,7 @@ function computeStats(eq){
   if(!w)w={min:2,max:4,aps:1.2,crit:5};
   const o={wclass,u:Object.fromEntries(EQ.map(k=>eq[k]).filter(i=>i&&i.uq).map(i=>[UNIQ[i.uq].fx,1])),m:Object.fromEntries(Object.keys(s).filter(k=>k.startsWith('mod_')&&s[k]).map(k=>[k.slice(4),1])),attackDmg:s.attackDmg||0,spellDmg:s.spellDmg||0,eleDmg:s.eleDmg||0,rangeInc:s.rangeInc||0,areaInc:s.areaInc||0,surge:s.surge||0,archmage:s.archmage||0,skillDmg:s.skillDmg,cdr:s.cdr,berserk:s.berserk,secondWind:s.secondWind,execute:s.execute,unbreak:s.unbreak,treasure:s.treasure,life:Math.round(s.life),armour:Math.round(s.armour*(1+s.treeArmour/100)),wmin:w.min,wmax:w.max,aps:Math.round(w.aps*(1+s.incAps/100)*100)/100,
     crit:Math.round(w.crit*(1+s.incCrit/100)*10)/10,critMulti:s.critMulti,addPhys:s.addPhys,incPhys:s.incPhys,addFire:s.addFire,addCold:s.addCold,addPoison:s.addPoison,
-    res:{phys:0,fire:Math.min(75,s.fireRes+s.allRes),cold:Math.min(75,s.coldRes+s.allRes),poison:Math.min(75,s.poisonRes+s.allRes)},regen:Math.round(s.regen*10)/10,lifeOnHit:s.lifeOnHit,
+    res:{phys:0,fire:Math.min(75,s.fireRes+s.allRes),cold:Math.min(75,s.coldRes+s.allRes),poison:Math.min(75,s.poisonRes+s.allRes)},resRaw:{fire:s.fireRes+s.allRes,cold:s.coldRes+s.allRes,poison:s.poisonRes+s.allRes},regen:Math.round(s.regen*10)/10,lifeOnHit:s.lifeOnHit,
     lootFind:s.lootFind,ms:s.ms,speed:150*(1+s.ms/100),bag:25+s.bagCap,dodge:Math.min(80,s.dodge)};
   const phys=((o.wmin+o.wmax)/2+o.addPhys)*(1+o.incPhys/100),ele=o.addFire+o.addCold+o.addPoison,cf=1+Math.min(1,o.crit/100)*(o.critMulti/100-1);
   if(o.archmage)o.life=Math.round(o.life*.8);
@@ -683,7 +723,7 @@ function genFloor(rng,floor,extra,wk){
   const onPath=new Set();for(let v=end;v>=0;v=par[v])onPath.add(v);
   const order=[];(function dfs(u,p){order.push(u);const kids=adj[u].filter(v=>v!==p).sort((a,c)=>(onPath.has(a)?1:0)-(onPath.has(c)?1:0));for(const v of kids)dfs(v,u)})(0,-1);
   const L={W,H,tiles,b,floor,rooms,order,enemies:[],nodes:[],chests:[],parts:[],texts:[],seen:new Uint8Array(W*H),endRoom:end,turrets:[],shots:[],puddles:[],ventOff:{},pshots:[],rings:[]};
-  L.mods=[...new Set([...(wk||[]),...abyssMods(floor),...(extra||[])])];L.wk=!!wk;L.modset=Object.fromEntries(L.mods.map(m=>[m,1]));L.lootQ=L.mods.reduce((a,m)=>a+FMODS[m].q,0);
+  L.mods=[...new Set([...(wk||[]),...(wk?abyssMods(floor):[]),...(extra||[])])];L.wk=!!wk;L.modset=Object.fromEntries(L.mods.map(m=>[m,1]));L.lootQ=L.mods.reduce((a,m)=>a+FMODS[m].q,0);
   const used=new Set(),key=(x,y)=>x+','+y,free=(x,y)=>tileAt(L,x,y)===0&&!used.has(key(x,y));
   const box=(tx,ty,w,h)=>({x:(tx+.5)*TS-w/2,y:(ty+.5)*TS-h/2,w,h});
   const pick=(r,inner)=>{for(let i=0;i<30;i++){const x=r.x+inner+Math.floor(rng()*(r.w-2*inner)),y=r.y+inner+Math.floor(rng()*(r.h-2*inner));if(free(x,y)){used.add(key(x,y));return[x,y]}}return null};
@@ -1366,7 +1406,7 @@ function viewGuide(){
   h+=sec('Weapons and skills',`<p style="margin:0 0 8px">Every weapon type attacks differently and has <b>3 skills</b>. In a <b>single run</b> you tap the skill buttons yourself. In <b>idle expeditions</b> the runner casts them automatically when they make sense. Skills hit harder as your weapon gets better.</p>${Object.keys(WCLASS).map(c=>`<div class="row" style="display:block"><b>${WCLASS[c].n}${WCLASS[c].range?' (ranged)':''}</b>${WCLASS[c].skills.map(k=>`<div class="note"><b style="color:#ffe2b0">${SKILLS[k].n}</b> (${SKILLS[k].cd}s): ${SKILLS[k].d}</div>`).join('')}</div>`).join('')}`);
   h+=sec('Bosses',`<p style="margin:0 0 8px">The last floor of each biome (4, 9, 14, 19…) ends with the biome's boss guarding the exit, and the 3rd floor of each biome (7, 12, 17…) has a <b>Warden</b>: a huge Champion with guards and a bonus chest. The exit and stairs stay <b>sealed</b> until it falls. Bosses telegraph their big attacks with red circles (Hazard Dodge helps), get <b>enraged</b> at half Life, and drop 2 items, piles of materials, Starmetal and a lot of XP.</p>${BOSSN.map((n,i)=>`<div class="row" style="display:block"><b>${n}</b> <span class="note">(${BIOMES[i].name})</span><div class="note">${BOSSKIT[i].map(a=>a.n).join(' · ')}${i===0?' · splits into slimes when enraged':''}</div></div>`).join('')}`);
   h+=sec('Levels and the skill tree',`<p style="margin:0">Every kill gives XP: more on deeper floors, 5× for Champions and 30× for bosses. XP is kept <b>even if the runner dies</b>. Each level gives 1 point for the <b>Tree</b> tab, which has five sections: <span style="color:#ff8a6a">Might</span> (attack damage for every weapon except staves), <span style="color:#b48cff">Sorcery</span> (spell damage for staves, plus elemental damage), <span style="color:#8fb0ff">Fortitude</span> (defense), <span style="color:#7ee36b">Cunning</span> (dodge, speed, loot and cooldowns) and <span style="color:#ffd36a">Weapons</span>. In Weapons, each weapon type has a Mastery, an Adept node, and three ✦ nodes that change how its skills work, like Split Fire turning Fireball into 3 orbs. Weapon nodes only work while that weapon is equipped. There are far more nodes than points, so pick a build. You can reset the tree for a few materials.</p>`);
-  h+=sec('Endgame: the Abyss, maps, uniques',`<p style="margin:0 0 8px"><b>Endless depth:</b> a new biome starts at every multiple of 5 (the Mines are the short first one, depths 1–4). Checkpoints sit at depth 1, 5, 10, 15… After the Abyss (20–24) the biomes loop as <b>Tier II, III…</b> with Elder and Ancient monsters and permanent modifiers. Monsters get stronger every floor and again at every biome change. The <b>Danger</b> number shows how much. From depth 10 floors roll modifiers like Hasted or Volatile, with one more every 5 floors, plus bigger loot. Deeper floors drop more materials and items, and from depth 8 monsters sometimes drop crafting currency directly. The top modifier tier (T1) needs item level 20, <b>Abyssal</b> needs item level 25, and Void bases drop from depth 20. <b>Empower</b> any item in Town → Empowering for an endless +5% per level.</p>
+  h+=sec('Endgame: the Abyss, maps, uniques',`<p style="margin:0 0 8px"><b>Endless depth:</b> a new biome starts at every multiple of 5 (the Mines are the short first one, depths 1–4). Checkpoints sit at depth 1, 5, 10, 15… After the Abyss (20–24) the biomes loop as <b>Tier II, III…</b> with Elder and Ancient monsters. Monsters get a little stronger every floor on a smooth curve: steeper early on, then a steady climb with no sudden jumps. The <b>Danger</b> number shows how much. Floor modifiers like Hasted or Volatile only appear on <b>Delve Maps</b> and in the <b>weekly challenge</b>. Deeper floors drop more materials and items, and from depth 8 monsters sometimes drop crafting currency directly. The top modifier tier (T1) needs item level 20, <b>Abyssal</b> needs item level 25, and Void bases drop from depth 20. <b>Empower</b> any item in Town → Empowering for an endless +5% per level.</p>
     <p style="margin:0 0 8px"><b>Delve Maps</b> are rare: bosses drop one about a third of the time, and deep Champions and chests very rarely. Clear a map and you <b>choose one of three rewards</b> (unique item, rare gear, currency, Empowering materials or a deeper map). More modifiers mean bigger rewards. A map is one floor with 1–4 modifiers you choose to take on for more loot and XP, and it always ends in a boss. Run them from the Run tab, and reroll a bad roll for a few materials.</p>
     <p style="margin:0"><b>Unique items</b> (orange) have fixed modifiers and an effect that shapes your build. Each boss has its own drops, and Abyss bosses can drop any of them. Uniques can't be crafted, but Divine Dust rerolls their values.</p>${UQK.map(k=>`<div class="row" style="display:block"><b style="color:#ff9a3a">${UNIQ[k].n}</b> <span class="note">(${BASES[UNIQ[k].base].n} · ${UNIQ[k].src.map(i=>i===4?'Abyss bosses':BOSSN[i]).join(', ')})</span><div class="note">${UNIQ[k].d}</div></div>`).join('')}`);
   h+=sec('Town, prestige and the weekly challenge',`<p style="margin:0 0 8px"><b>Town buildings</b> are where spare materials go: the Refinery makes refining cheaper, the Smithy improves crafting rolls, Training Grounds add XP, and the Runner Lodge shortens rest between expedition runs.</p>
@@ -1412,6 +1452,7 @@ function viewRun(){
       <div class="set"><div>Leave when bag is full<small>Bag holds ${st.bag}</small></div><button class="toggle ${s.leaveFull?'on':''}" id="tglFull"></button></div>
       <div class="set"><div>Swap out junk when full<small>Drops the least valuable thing in the bag to grab something better</small></div><button class="toggle ${s.autoSwap?'on':''}" id="tglSwap"></button></div>
       <div class="set"><div>Expedition length<small>Idle mode: back-to-back runs while you're away</small></div><div class="step"><button data-st="idleLen" data-d="-1">−</button><b>${IDLE_LBL[s.idleLen]}</b><button data-st="idleLen" data-d="1">+</button></div></div>
+      <div class="set"><div>Rotate biomes<small>Idle mode: each run starts in the next biome (up to your checkpoint) for every kind of material${s.rotate!==false&&idleRot(s.startFloor).length>1?`: ${idleRot(s.startFloor).map(f=>BIOMES[biomeOf(f)].name.split(' ').pop()+' '+f).join(' → ')}`:''}</small></div><button class="toggle ${s.rotate!==false?'on':''}" id="tglRot"></button></div>
       <input class="seed" id="seedIn" inputmode="numeric" placeholder="Seed (blank = random)">
       <div class="btnrow"><button class="btn" id="liveBtn">Single run</button><button class="btn blue" id="idleBtn">Idle expedition</button></div>
       <div class="note" style="margin-top:8px">Single runs play now, with speed controls and a bag. Expeditions run in real time for ${IDLE_LBL[s.idleLen]}, and you can watch them live at any point.</div>
@@ -1429,7 +1470,7 @@ function viewRun(){
   const sinceBackup=S.runs-(S.backupRuns||0);
   h+=`<div class="card"><h3>Save &amp; backup</h3>
     <div class="row"><b>This device</b><span id="localStat">${localText()}</span></div>
-    <div class="row"><b>Cloud save</b><span id="cloudStat">${cloudText()}</span></div>
+    <div class="row"><b>Cloud save</b><span id="cloudStat">${cloudText()}</span></div><div id="acctBox">${acctButtons()}</div>
     <div class="row"><b>Last backup file</b><span>${S.backupAt?new Date(S.backupAt).toLocaleDateString():'Never'}</span></div>
     <div class="btnrow" style="margin-top:10px"><button class="btn small" id="fileBtn">Save backup file</button><button class="btn small ghost" id="loadFileBtn">Load backup file</button></div>
     <div class="btnrow" style="margin-top:8px"><button class="btn small ghost" id="snapBtn">Restore points</button><button class="btn small ghost" id="expBtn">Copy code</button><button class="btn small ghost" id="impBtn">Paste code</button></div>
@@ -1451,6 +1492,7 @@ function viewRun(){
     else{s.target=clamp((s.target||0)+d,0,15);if(s.target&&s.target<s.startFloor)s.target=d<0?0:s.startFloor}
     persist();viewRun()});
   const tsm=$('#tglSmart');if(tsm)tsm.onclick=()=>{s.smart=!s.smart;persist();viewRun()};
+  const trt=$('#tglRot');if(trt)trt.onclick=()=>{s.rotate=s.rotate===false;persist();viewRun()};
   const tsw=$('#tglSwap');if(tsw)tsw.onclick=()=>{s.autoSwap=!s.autoSwap;persist();viewRun()};
   const tf=$('#tglFull');if(tf)tf.onclick=()=>{s.leaveFull=!s.leaveFull;persist();viewRun()};
   const seed=()=>{const v=parseInt(($('#seedIn')||{}).value,10);return Number.isFinite(v)?Math.abs(v)%1000000:1+Math.floor(Math.random()*999999)};
@@ -1461,7 +1503,7 @@ function viewRun(){
   const wb=$('#watchBtn');if(wb)wb.onclick=startWatch;
   const rb=$('#recallBtn');if(rb)rb.onclick=()=>modal('Recall the runner?','You keep the loot from every finished run. Whatever it is carrying in the current run is lost.',[{label:'Recall now',cls:'danger',fn:()=>{S.idle.finished=true;S.idle.recalled=true;persist();collectIdle()}},{label:'Keep going',cls:'ghost'}]);
   wireRunExtras();
-  $('#expBtn').onclick=exportSave;$('#impBtn').onclick=importSave;$('#fileBtn').onclick=backupFile;$('#loadFileBtn').onclick=loadFile;$('#snapBtn').onclick=showSnaps;const nb=$('#nudgeBtn');if(nb)nb.onclick=backupFile;
+  $('#expBtn').onclick=exportSave;$('#impBtn').onclick=importSave;$('#fileBtn').onclick=backupFile;bindAcct();$('#loadFileBtn').onclick=loadFile;$('#snapBtn').onclick=showSnaps;const nb=$('#nudgeBtn');if(nb)nb.onclick=backupFile;
   $('#resetBtn').onclick=()=>modal('Reset all progress?','This wipes your materials, currency, gear and records. A restore point of your current progress is kept on this device.',[{label:'Wipe everything',cls:'danger',fn:()=>{snapNow();setTimeout(()=>{defSave();myWriteT=0;try{localStorage.setItem(KEY+'_t','0')}catch(e){}persist();setTab('run')},50)}},{label:'Cancel',cls:'ghost'}]);
 }
 setInterval(()=>{if(S.idle&&!S.idle.finished)idleCatchUp();else updIdleCard()},1000);
@@ -1492,38 +1534,53 @@ function slotRow(it,sl){
   if(!it)return `<div class="slotrow"><div><div class="sl">${SLOTN[sl]}</div><div class="nm note">Empty</div></div></div>`;
   return `<div class="slotrow" data-item="${it.uid}" data-iu="${it.uid}"><div><div class="sl">${SLOTN[it.slot]}${idleLocked(it)?' · locked':''}</div><div class="nm r${it.rarity}">${it.fav?'<span style="color:#ffd36a">★ </span>':''}${itemName(it)}</div><div class="meta">${it.rarity===2?BASES[it.base].n+' · ':''}ilvl ${it.ilvl} · ${it.mods.length} mods</div></div><span class="note">›</span></div>`;
 }
-function gearScore(eq,f){const st=computeStats(eq),sp=bsplit(f),raw=mDMG(f)*1.5;let taken=0;
-  for(const k of TYPES){const sh=sp[k]||0;if(!sh)continue;const rv=raw*sh;taken+=k==='phys'?rv*(1-Math.min(.9,st.armour/(st.armour+5*rv))):rv*(1-st.res[k]/100)}
-  const ehp=st.life*raw/Math.max(.05*raw,taken)*(1+st.dodge/250)+st.regen*12+st.lifeOnHit*st.aps*8;
-  return st.dps*ehp*(1+st.bag/400)*(1+st.lootFind/600)*(1+st.ms/500)}
-function equipBest(){if(S.idle){toast("Gear is locked while an expedition is running");return}
-  const f=Math.max(1,(S.best||1)),cls=S.eq.weapon?BASES[S.eq.weapon.base].cls:null,eq={...S.eq},pool=[...S.inv],changes=[];
+const BEST_W={balanced:[.65,.35,'Balanced'],damage:[.9,.1,'Damage'],survival:[.3,.7,'Survival']};
+function gearParts(eq,f){const st=computeStats(eq),sp=bsplit(f),raw=mDMG(f)*1.5;let taken=0;
+  for(const k of TYPES){const sh=sp[k]||0;if(!sh)continue;const rv=raw*sh;taken+=k==='phys'?rv*(1-Math.min(.9,st.armour/(st.armour+5*rv))):rv*(1-Math.min(75,st.res[k])/100)}
+  const ehp=(st.life+(st.regen+st.lifeOnHit*st.aps*.8)*5)*raw/Math.max(.05*raw,taken)*(1+st.dodge/250);
+  return{st,dps:Math.max(.1,st.dps),ehp:Math.max(1,ehp),util:(1+st.bag/400)*(1+st.lootFind/600)*(1+st.ms/500)}}
+function gearScore(eq,f,mode){const w=BEST_W[mode||'balanced'],p=gearParts(eq,f);return Math.pow(p.dps,w[0])*Math.pow(p.ehp,w[1])*p.util}
+function equipBest(mode){if(S.idle){toast("Gear is locked while an expedition is running");return}
+  mode=mode||S.bestMode||'balanced';S.bestMode=mode;
+  const f=Math.max(1,(S.best||1)),cls=S.eq.weapon?BASES[S.eq.weapon.base].cls:null,eq={...S.eq},pool=[...S.inv];
   const fits=(it,k)=>it.slot===k||(k==='ring2'&&it.slot==='ring');
-  for(let pass=0;pass<3;pass++){let any=false;
-    for(const k of EQ){let best=gearScore(eq,f),pick=null;
+  for(let pass=0;pass<4;pass++){let any=false;
+    for(const k of EQ){let best=gearScore(eq,f,mode),pick=null;
       for(const it of pool){if(!fits(it,k))continue;if(k==='weapon'&&cls&&BASES[it.base].cls!==cls)continue;
-        const t={...eq,[k]:it},sc=gearScore(t,f);if(sc>best*1.001){best=sc;pick=it}}
-      if(pick){const old=eq[k];pool.splice(pool.indexOf(pick),1);if(old)pool.push(old);eq[k]=pick;changes.push([k,pick]);any=true}}
+        const sc=gearScore({...eq,[k]:it},f,mode);if(sc>best*1.0005){best=sc;pick=it}}
+      if(pick){const old=eq[k];pool.splice(pool.indexOf(pick),1);if(old)pool.push(old);eq[k]=pick;any=true}}
     if(!any)break}
-  const fin={};for(const [k,it] of changes)fin[k]=it;const ks=Object.keys(fin).filter(k=>fin[k]!==S.eq[k]);
-  if(!ks.length){toast('You already have your best gear on');return}
+  const ks=EQ.filter(k=>eq[k]!==S.eq[k]);
   const before=computeStats(S.eq),after=computeStats(eq);
-  modal('Equip best gear?',`<div class="note" style="margin-bottom:8px">Picked for balance of damage and survival at depth ${f}. Weapons stay ${cls&&WCLASS[cls]?WCLASS[cls].n:'the same type'} so your skills and tree don't change.</div>`+ks.map(k=>`<div class="row"><b>${SLOTN[k]}</b><span class="r${fin[k].rarity}">${itemName(fin[k])}</span></div>`).join('')+
-    `<div class="row" style="margin-top:6px"><b>DPS</b><span>${before.dps} → <b>${after.dps}</b></span></div><div class="row"><b>Life</b><span>${before.life} → <b>${after.life}</b></span></div><div class="row"><b>Armour</b><span>${before.armour} → <b>${after.armour}</b></span></div>`,
-    [{label:'Equip these',fn:()=>{S.flags.equipped=1;S.eq=eq;S.inv=pool;persist();render();toast(`Equipped ${ks.length} item${ks.length>1?'s':''}`)}},{label:'Cancel',cls:'ghost'}])}
+  // best weapon of a different type, for information
+  let alt=null;if(cls){let bd=after.dps;for(const it of S.inv){if(it.slot!=='weapon'||BASES[it.base].cls===cls)continue;const d=computeStats({...eq,weapon:it}).dps;if(d>bd*1.05){bd=d;alt={it,d}}}}
+  const chips=`<div class="chips" style="margin:0 0 10px;gap:6px">${Object.entries(BEST_W).map(([k,v])=>`<button class="btn small ${k===mode?'':'ghost'}" data-bm="${k}" style="width:auto;flex:1">${v[2]}</button>`).join('')}</div>`;
+  const why={balanced:'Mostly damage, with survival still counted.',damage:'Damage first. Survival barely counts.',survival:'Survival first: life, armour, resistances, dodge.'}[mode];
+  let body=chips+`<div class="note" style="margin-bottom:8px">${why} Scored at depth ${f}. Weapons stay ${cls&&WCLASS[cls]?WCLASS[cls].n:'the same type'} so your skills and tree don't change.</div>`;
+  body+=ks.length?ks.map(k=>`<div class="row"><b>${SLOTN[k]}</b><span class="r${eq[k].rarity}">${itemName(eq[k])}</span></div>`).join(''):`<div class="note" style="margin-bottom:6px">Nothing to change: your current gear is already the best for this choice.</div>`;
+  body+=`<div class="row" style="margin-top:6px"><b>DPS</b><span>${before.dps} → <b>${after.dps}</b></span></div><div class="row"><b>Life</b><span>${before.life} → <b>${after.life}</b></span></div><div class="row"><b>Armour</b><span>${before.armour} → <b>${after.armour}</b></span></div>`;
+  // explain when a higher-DPS weapon of the same type was passed over
+  {const cur=eq.weapon;let top=null,td=cur?computeStats(eq).dps:0;for(const it of S.inv.concat(S.eq.weapon&&S.eq.weapon!==cur?[S.eq.weapon]:[])){if(it===cur||it.slot!=='weapon'||(cls&&BASES[it.base].cls!==cls))continue;const t={...eq,weapon:it},d=computeStats(t).dps;if(d>td+1){td=d;top={it,st:computeStats(t)}}}
+    if(top&&cur){const a=after,bb=top.st,loss=[];if(a.lifeOnHit-bb.lifeOnHit>.4)loss.push(`${Math.round((a.lifeOnHit-bb.lifeOnHit)*10)/10} life per hit`);if(a.life-bb.life>=5)loss.push(`${a.life-bb.life} life`);
+      for(const k of ['fire','cold','poison'])if(a.res[k]-bb.res[k]>=5)loss.push(`${Math.round(a.res[k]-bb.res[k])}% ${k} res`);if(a.dodge-bb.dodge>=3)loss.push(`${Math.round(a.dodge-bb.dodge)}% dodge`);if(a.armour-bb.armour>=20)loss.push(`${a.armour-bb.armour} armour`);
+      body+=`<div class="note" style="margin-top:8px">Kept <span class="r${cur.rarity}">${itemName(cur)}</span> over <span class="r${top.it.rarity}">${itemName(top.it)}</span> (+${Math.round(top.st.dps-a.dps)} DPS)${loss.length?' because switching would lose '+loss.join(', '):''}. Pick <b>Damage</b> above to go for DPS.</div>`}}
+  if(alt)body+=`<div class="note" style="margin-top:8px;color:#ffd36a">Tip: your <span class="r${alt.it.rarity}">${itemName(alt.it)}</span> (${WCLASS[BASES[alt.it.base].cls].n}) would give about ${Math.round(alt.d)} DPS, but it's a different weapon type, so equip it by hand if you want to switch.</div>`;
+  modal('Equip best gear?',body,ks.length?[{label:'Equip these',fn:()=>{S.flags.equipped=1;S.eq=eq;S.inv=pool;persist();render();toast(`Equipped ${ks.length} item${ks.length>1?'s':''}`)}},{label:'Cancel',cls:'ghost'}]:[{label:'OK',cls:'ghost'}]);
+  document.querySelectorAll('[data-bm]').forEach(b=>b.onclick=()=>equipBest(b.dataset.bm))}
+const rn=v=>typeof v!=='number'?v:Math.abs(v)>=10?Math.round(v):Math.round(v*10)/10;
 function viewGear(){
   const st=computeStats(S.eq);
   let h=`<div class="card" style="padding:10px 14px 4px;text-align:center;background:radial-gradient(ellipse at center,#2e2416 0%,var(--panel) 70%)">${heroSVG(S.eq,st.wclass,S.lvl,ptitle())}</div><div class="card"><h3>Character sheet</h3>
     <div class="row"><b>Life</b><span>${Math.round(st.life)}</span></div>
     <div class="row"><b>DPS (estimate)</b><span>${Math.round(st.dps)}</span></div>
-    <div class="row"><b>Weapon</b><span>${st.wmin}–${st.wmax} phys · ${st.aps} atk/s · ${st.crit}% crit · ${st.critMulti}% crit dmg</span></div>
-    <div class="row"><b>Added damage</b><span>${st.addPhys?`<span>${st.addPhys} phys</span> `:''}${TYPES.slice(1).map(k=>st['add'+TNAME[k]]?`<span style="color:${TCOL[k]}">${st['add'+TNAME[k]]} ${k}</span>`:'').join(' ')||'—'}${st.incPhys?` · +${st.incPhys}% phys`:''}</span></div>
+    <div class="row"><b>Weapon</b><span>${rn(st.wmin)}–${rn(st.wmax)} phys · ${rn(st.aps)} atk/s · ${rn(st.crit)}% crit · ${rn(st.critMulti)}% crit dmg</span></div>
+    <div class="row"><b>Added damage</b><span>${[st.addPhys?`<span>${rn(st.addPhys)} phys</span>`:'',...TYPES.slice(1).map(k=>st['add'+TNAME[k]]?`<span style="color:${TCOL[k]}">${rn(st['add'+TNAME[k]])} ${k}</span>`:'')].filter(Boolean).join(' ')||'—'}${st.incPhys?` · +${rn(st.incPhys)}% phys`:''}</span></div>
     <div class="row"><b>Armour</b><span>${Math.round(st.armour)}</span></div>
-    <div class="row"><b>Poison / Cold / Fire res</b><span><span style="color:${TCOL.poison}">${Math.round(st.res.poison)}%</span> / <span style="color:${TCOL.cold}">${Math.round(st.res.cold)}%</span> / <span style="color:${TCOL.fire}">${Math.round(st.res.fire)}%</span></span></div>
+    <div class="row"><b>Poison / Cold / Fire res<small style="display:block;font-weight:500;color:var(--dim);font-size:11px">max 75% · <span style="color:#ffb070">+N</span> = wasted over the cap</small></b><span><span style="color:${TCOL.poison}">${Math.round(st.res.poison)}%${st.resRaw.poison>75.5?`<small style="color:#ffb070"> +${Math.round(st.resRaw.poison-75)}</small>`:''}</span> / <span style="color:${TCOL.cold}">${Math.round(st.res.cold)}%${st.resRaw.cold>75.5?`<small style="color:#ffb070"> +${Math.round(st.resRaw.cold-75)}</small>`:''}</span> / <span style="color:${TCOL.fire}">${Math.round(st.res.fire)}%${st.resRaw.fire>75.5?`<small style="color:#ffb070"> +${Math.round(st.resRaw.fire-75)}</small>`:''}</span></span></div>
     <div class="row"><b>Sustain</b><span>${Math.round(st.regen*10)/10} regen/s · ${Math.round(st.lifeOnHit*10)/10} life per hit</span></div>
     <div class="row"><b>Weapon type</b><span>${WCLASS[st.wclass].n}${WCLASS[st.wclass].range?' (ranged)':''} · ${WCLASS[st.wclass].skills.map(k=>SKILLS[k].n).join(', ')}</span></div>
     <div class="row"><b>Hazard Dodge</b><span>${Math.round(st.dodge)}%${st.dodge?'':' (the runner won\'t sidestep puddles, vents or darts)'}</span></div>
-    <div class="row"><b>Utility</b><span>${Math.round(st.ms)}% move · ${Math.round(st.lootFind)}% materials · bag ${st.bag}</span></div>
+    <div class="row"><b>Utility</b><span>${Math.round(st.ms)}% move · ${Math.round(st.lootFind)}% materials · bag ${rn(st.bag)}</span></div>
     <button class="btn" id="bestBtn" style="margin-top:10px" ${S.idle?'disabled':''}>Equip best gear</button></div>`;
   h+=`<div class="card"><h3>Equipped</h3>${EQ.map(sl=>slotRow(S.eq[sl],sl)).join('')}
     <div class="note" style="margin-top:4px">Charm: ${S.charm?S.charm.n+' (saves '+S.charm.save*100+'%)':'none. Make one in Town → Refining.'}</div></div>`;
@@ -1535,7 +1592,7 @@ function viewGear(){
     ${picked.size?`<div class="note" style="margin:6px 0 4px">You'll get:</div>${matList(tot)}`:'<div class="note" style="margin:6px 0">Tap items to select them, or use the quick-select buttons.</div>'}<div style="height:10px"></div>`}
   h+=`${S.inv.length?sortedInv().map(it=>selMode?pickRow(it):slotRow(it)).join(''):'<div class="note">Empty. Items drop in the dungeon.</div>'}</div>`;
   $('#view').innerHTML=h;
-  {const bb=$('#bestBtn');if(bb)bb.onclick=equipBest}
+  {const bb=$('#bestBtn');if(bb)bb.onclick=()=>equipBest()}
   document.querySelectorAll('[data-item]').forEach(e=>e.onclick=()=>itemModal(findItem(+e.dataset.item)));
   const keep=()=>{const y=$('#town').scrollTop;viewGear();$('#town').scrollTop=y};
   const sb=$('#selBtn');if(sb)sb.onclick=()=>{selMode=!selMode;picked.clear();keep()};
@@ -1692,9 +1749,9 @@ async function submitWeekly(floor,kills){
 }
 function updBoard(){const el=document.getElementById('lbList');if(!el)return;
   if(lbState==='loading'){el.innerHTML='<div class="note">Loading leaderboard…</div>';return}
-  if(lbState!=='ok'){el.innerHTML=`<div class="note">${lbState==='error'?"Can't reach the leaderboard right now.":"The shared leaderboard isn't available on this link. Your best score is still saved on this device."}</div>`;return}
+  if(lbState!=='ok'){el.innerHTML=`<div class="note">${lbState==='error'?"Can't reach the leaderboard right now.":(USE_FB?'Sign in (Run tab → Save &amp; backup) to see and join the shared leaderboard.':'The shared leaderboard isn\'t available on this link. Your best score is still saved on this device.')}</div>`;return}
   if(!lbCache.length){el.innerHTML='<div class="note">No scores yet this week. Be the first!</div>';return}
-  el.innerHTML=lbCache.map((r,i)=>`<div class="row"><span style="text-align:left;color:${r.id===UID?'var(--accent)':'var(--ink)'}">${i+1}. ${String(r.name||'Runner').replace(/[<>&]/g,'')}</span><span>Floor ${r.floor} · ${r.kills} kills</span></div>`).join('')}
+  el.innerHTML=lbCache.map((r,i)=>`<div class="row"><span style="text-align:left;color:${r.id===UID?'var(--accent)':'var(--ink)'}">${i+1}. ${String(r.name||'Runner').replace(/[<>&]/g,'')}</span><span>Depth ${r.floor} · ${r.kills} kills</span></div>`).join('')}
 function mapsCard(){
   if(!S.maps.length)return `<div class="card"><h3>Delve Maps</h3><div class="note">Delve Maps are rare: bosses sometimes drop one, and Champions and chests on deeper floors very rarely do. A map is a single floor with modifiers you take on for extra loot, and it always ends in a boss.</div></div>`;
   const rc={silk:4,crystal:2};
@@ -1777,9 +1834,11 @@ const idleElapsed=()=>Math.max(0,(Date.now()-S.idle.start)/1000);
 const idleSeed=i=>(S.idle.seed+i*7919)%999983+1;
 function idleNowText(){const I=S.idle;if(idleElapsed()<I.doneT)return `Resting in town · next run in ${fmtHM(I.doneT-idleElapsed())}`;
   const cur=idlePending&&idlePending.i===I.runs.length?idlePending.r:null;if(!cur)return `Run ${I.runs.length+1}`;
-    const seen=cur.log.filter(l=>l.t<=idleElapsed()-I.doneT),f=seen.length?seen[seen.length-1].f:I.set.startFloor;return `Run ${I.runs.length+1} · Depth ${f}`}
+    const seen=cur.log.filter(l=>l.t<=idleElapsed()-I.doneT),f=seen.length?seen[seen.length-1].f:idleSet(I.runs.length).startFloor;return `Run ${I.runs.length+1} · Depth ${f}`}
 function soFarText(){const P=S.idle.pool;return `${P.runs} runs · ${P.escapes} escaped · ${P.deaths} died · ${P.units} banked`}
-function simIdleRun(i){const s=new Sim(idleSeed(i),S.idle.st,S.idle.set,false);s.auto=true;let g=0;while(!s.done&&g++<200000)s.step(IDLE_DT);const r=s.summary();r.tx=s.t;return r}
+function idleRot(start){const cps=checkpoints().filter(f=>f<=start),by={};for(const f of cps)by[biomeOf(f)]=f;const b0=biomeOf(start),out=[];for(let k=0;k<5;k++){const b=(b0+k)%5;if(by[b])out.push(by[b])}return out.length?out:[start]}
+function idleSet(i){const I=S.idle,r=I.rot||[I.set.startFloor];return {...I.set,startFloor:r[i%r.length]}}
+function simIdleRun(i){const s=new Sim(idleSeed(i),S.idle.st,idleSet(i),false);s.auto=true;let g=0;while(!s.done&&g++<200000)s.step(IDLE_DT);const r=s.summary();r.tx=s.t;return r}
 function commitRun(r){
   const I=S.idle,P=I.pool,died=r.outcome==='died';let frac=1;
   if(died){if(I.charm&&!I.charmUsed){frac=I.charm.save;I.charmUsed=true}else frac=0}
@@ -1806,7 +1865,7 @@ async function idleCatchUp(){
   updIdleCard();
 }
 function startIdle(seed){
-  S.idle={v:2,rest:240-45*(S.town.lodge||0),start:Date.now(),dur:IDLE_LENS[S.set.idleLen],seed,st:computeStats(S.eq),set:{...S.set},charm:S.charm,charmUsed:false,runs:[],doneT:0,finished:false,
+  S.idle={v:2,rot:S.set.rotate===false?[S.set.startFloor]:idleRot(S.set.startFloor),rest:240-45*(S.town.lodge||0),start:Date.now(),dur:IDLE_LENS[S.set.idleLen],seed,st:computeStats(S.eq),set:{...S.set},charm:S.charm,charmUsed:false,runs:[],doneT:0,finished:false,
     pool:{mats:{},items:[],units:0,lost:0,salv:0,runs:0,deaths:0,escapes:0,kills:0,deep:0,cleared:0,taken:{phys:0,poison:0,cold:0,fire:0},killT:0,lostFull:0,swapped:0}};
   S.flags.expedition=1;idlePending=null;persist();viewRun();idleCatchUp();toast(`Expedition started. Back in ${fmtHM(S.idle.dur)}.`);
 }
@@ -1846,7 +1905,7 @@ async function startWatch(){
 }
 function beginWatchRun(){
   const I=S.idle;watchI=I.runs.length;
-  sim=new Sim(idleSeed(watchI),I.st,I.set,false);sim.auto=true;sim.watchBase=I.doneT;sim.charm=null;buildSkillBar(true);
+  sim=new Sim(idleSeed(watchI),I.st,idleSet(watchI),false);sim.auto=true;sim.watchBase=I.doneT;sim.charm=null;buildSkillBar(true);
   const off=idleElapsed()-I.doneT;let g=0;while(!sim.done&&sim.t+IDLE_DT<=off&&g++<400000)sim.step(IDLE_DT);
   sim.visual=true;lastLog=-1;$('#watchLbl').textContent=`Expedition run ${watchI+1} · live`;
 }
@@ -2157,7 +2216,7 @@ if(S.idle&&!S.idle.v){try{applyResult(S.idle.res,S.idle.charm)}catch(e){}S.idle=
 if(!S.welcomed){S.welcomed=1;persist();setTimeout(()=>modal('Welcome to Delvesmith',`<p style="margin:0 0 10px">Your <b>runner</b> dives into a dungeon on its own. It fights, mines and loots, and brings home materials and gear, if it survives.</p><p style="margin:0 0 10px">Your job is the <b>workshop</b>: refine materials into crafting currency, craft better gear, and decide how far the runner should push.</p><p style="margin:0">A short tutorial at the bottom of the screen will walk you through it. The <b>Guide</b> tab has everything else.</p>`,[{label:"Let's go"}]),300)}
 initLocalSafety();
 updTabDots();
-window.__ds={empIntro,abyssMods,salv:salvageMats,Sim,computeStats,genItem,weekMods,mkUnique,mkMap,get S(){return S},get sim(){return sim},rollMod,simIdleRun,get pend(){return idlePending}};setTab(S.tab||'run');resize();initCloud();requestAnimationFrame(frame);
+window.__ds={idleRot,idleSet,localStats,empIntro,abyssMods,salv:salvageMats,Sim,computeStats,genItem,weekMods,mkUnique,mkMap,get S(){return S},get sim(){return sim},rollMod,simIdleRun,get pend(){return idlePending}};setTab(S.tab||'run');resize();initCloud();requestAnimationFrame(frame);
 })();
 </script>
 </body>
