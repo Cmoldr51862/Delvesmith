@@ -362,9 +362,10 @@ const SFX=(()=>{let ac=null,master=null,nb=null;const last={},q=[];
     click:()=>tone(1000,.03,'square',.04)};
   const GAP={hit:.06,crit:.08,swing:.08,arrow:.07,bolt:.07,kill:.07,hurt:.12,mine:.08,pickup:.08,boom:.1,trap:.15,fire:.1,frost:.1,toxic:.1};
   return{play(n){if(!on()||!P[n])return;const c=ctx();if(!c)return;const t=c.currentTime;if(last[n]!=null&&t-last[n]<(GAP[n]||.03))return;last[n]=t;master.gain.value=vol();try{P[n]()}catch(e){}},
-    unlock(){if(!on())return;if(ac&&ac.state!=='running'){try{ac.close()}catch(e){}ac=null;for(const k in last)delete last[k]}ctx()},revive,q,flush(){let k=0;while(q.length&&k++<6)this.play(q.shift());q.length=0}}})();
-document.addEventListener('pointerdown',()=>SFX.unlock(),{passive:true});document.addEventListener('touchend',()=>SFX.unlock(),{passive:true});
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)SFX.revive()});window.addEventListener('pageshow',()=>SFX.revive());
+    stale:false,
+    unlock(){if(!on())return;if(ac&&(this.stale||ac.state!=='running')){try{ac.close()}catch(e){}ac=null;for(const k in last)delete last[k]}this.stale=false;const c=ctx();if(!c)return;try{const b=c.createBuffer(1,1,22050),src=c.createBufferSource();src.buffer=b;src.connect(c.destination);src.start(0)}catch(e){}},revive,q,flush(){let k=0;while(q.length&&k++<6)this.play(q.shift());q.length=0}}})();
+for(const ev of ['touchend','click','keydown'])document.addEventListener(ev,()=>SFX.unlock(),{passive:true,capture:true});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)SFX.stale=true;else SFX.revive()});window.addEventListener('pagehide',()=>{SFX.stale=true});window.addEventListener('pageshow',()=>SFX.revive());
 const DOTC={B:'#ff5a5a',P:'#8fe36b',F:'#ffa040',C:'#9fdcff'};
 const SKN={fireball:{fire:'Fireball',cold:'Frost Bolt',poison:'Plague Bolt'},nova:{fire:'Fire Nova',cold:'Frost Nova',poison:'Toxic Nova'}};
 const SKD={fireball:{cold:'An icy orb that bursts for 200% in an area. Frost hits slow enemies.',poison:'A toxic orb that bursts for 200% in an area. Poison hits stack up to 5 times.'},
