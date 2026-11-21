@@ -1388,7 +1388,8 @@ function advice(rep,st){
   if(tot>0){
     const top=TYPES.slice().sort((a,b)=>rep.taken[b]-rep.taken[a])[0],pct=Math.round(rep.taken[top]/tot*100);
     if(top==='phys'&&pct>50)out.push(`${pct}% of the damage you took was <b>Physical</b>. Your Armour is ${st.armour}. Look for Armour, % increased Armour and Life on helmet, body and boots.`);
-    else if(top!=='phys'){const ess={poison:'Essence of Rot',cold:'Essence of Frost',fire:'Essence of Cinders'}[top];
+    else if(top!=='phys'&&st.res[top]>=75&&pct>50)out.push(`${pct}% of the damage you took was <b style="color:${TCOL[top]}">${TNAME[top]}</b>, but your ${TNAME[top]} Resistance is already at the 75% cap. More Life, Armour or Hazard Dodge will help more from here.`);
+    else if(top!=='phys'&&st.res[top]<75){const ess={poison:'Essence of Rot',cold:'Essence of Frost',fire:'Essence of Cinders'}[top];
       out.push(`${pct}% of the damage you took was <b style="color:${TCOL[top]}">${TNAME[top]}</b>, and your ${TNAME[top]} Resistance is only ${st.res[top]}%. Craft ${TNAME[top]} Resistance: <b>${ess}</b> guarantees it.`)}
   }
   if(rep.avgKill>5)out.push(`An average kill took <b>${rep.avgKill.toFixed(1)}s</b>, so your damage is falling behind. Upgrade your weapon (flat damage, % Physical, Attack Speed) or find a better base.`);
