@@ -1094,7 +1094,7 @@ class Sim{
         break}
     }
   }
-  gainMap(m){(this.maps=this.maps||[]).push(m);this.logm(`Found a Delve Map (Floor ${m.floor})`,'#c08aff');this.sfx('rare');this.fx(this.P.x+9,this.P.y-40,'Delve Map!','#c08aff')}
+  gainMap(m){if(Array.isArray(this.set.mapMods))return;(this.maps=this.maps||[]).push(m);this.logm(`Found a Delve Map (Floor ${m.floor})`,'#c08aff');this.sfx('rare');this.fx(this.P.x+9,this.P.y-40,'Delve Map!','#c08aff')}
   hurt(raw,src,split,melee){
     if(melee&&this.buff.smoke>0){this.fx(this.P.x+9,this.P.y-10,'Miss','#cfc6dc');return}
     if(melee&&(this.st.u||{}).phantom&&this.rng()*100<(this.st.dodge||0)/2){this.fx(this.P.x+9,this.P.y-10,'Evaded','#8fd3ff');return}
