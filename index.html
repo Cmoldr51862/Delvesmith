@@ -575,7 +575,9 @@ let cloudRef=null,cloudState='checking',cloudBusy=false,cloudAgain=false,cloudTi
 const persist=()=>{if(staleTab)return;setTimeout(()=>{try{tutTick()}catch(e){}},0);
   try{const ot=+localStorage.getItem(KEY+'_t')||0;if(myWriteT&&ot>myWriteT){staleTab=true;modal('Opened somewhere else','Delvesmith was saved from another tab or window after this one. To protect that newer progress this tab has stopped saving.',[{label:'Reload the newest save',fn:()=>location.reload()}]);return}}catch(e){}
   S.savedAt=Date.now();myWriteT=S.savedAt;const js=JSON.stringify(S);try{localStorage.setItem(KEY,js);localStorage.setItem(KEY+'_t',String(S.savedAt))}catch(e){}
-  idbSave(js);if(cloudRef&&cloudState==='on'){clearTimeout(cloudTimer);cloudTimer=setTimeout(cloudPush,3000)}};
+  idbSave(js);if(cloudRef&&cloudState==='on'&&!cloudTimer)cloudTimer=setTimeout(()=>{cloudTimer=null;cloudPush()},CLOUD_EVERY)};
+const CLOUD_EVERY=60000;function cloudFlush(){if(cloudTimer){clearTimeout(cloudTimer);cloudTimer=null;cloudPush()}}
+window.addEventListener('pagehide',()=>cloudFlush());
 function idbSave(js,force){clearTimeout(idbSave.t);if(!idbReady){idbSave.q=[js,force];return}idbSave.t=setTimeout(async()=>{try{await IDB.set('save',js);idbOK=true;
     if(force||Date.now()-lastSnapAt>10*60*1000){lastSnapAt=Date.now();let sn=(await IDB.get('snaps'))||[];sn.unshift({...saveSummary(S),js});sn=sn.slice(0,12);await IDB.set('snaps',sn)}}catch(e){idbOK=false}},force?0:400)}
 function backupPrompt(tries){tries=tries||0;clearTimeout(backupPrompt.t);
@@ -647,7 +649,7 @@ async function fbReset(){try{await fbLoad();await FB.Au.sendPasswordResetEmail(F
 async function fbSignOut(){try{await cloudPush()}catch(e){}try{await FB.Au.signOut(FB.auth)}catch(e){}toast('Signed out. Progress stays on this device too')}
 async function initCloud(){
   if(USE_FB){try{await fbLoad();try{await FB.Au.getRedirectResult(FB.auth)}catch(e){}FB.Au.onAuthStateChanged(FB.auth,u=>fbSync(u))}catch(e){cloudState='error';updSaveCard()}
-    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&cloudState==='on'){clearTimeout(cloudTimer);cloudPush()}});return}
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&cloudState==='on'){clearTimeout(cloudTimer);cloudTimer=null;cloudPush()}});return}
   try{
     if(!(window.claude&&typeof window.claude.use==='function')){cloudState='off';return updSaveCard()}
     const [db,user]=await Promise.all([window.claude.use('db'),window.claude.use('user')]);
@@ -1424,6 +1426,7 @@ function applyResult(res,charm){
   for(const k in res.bag){const v=res.bag[k],kv=Math.floor(v*frac*(1+gb/100)+1e-9);keptMats[k]=kv;lostMats[k]=Math.max(0,v-Math.floor(v*frac+1e-9));lostUnits+=lostMats[k];S.mats[k]=(S.mats[k]||0)+kv}
   const nk=res.hoarder?res.items.length:Math.floor(res.items.length*frac+1e-9),keptItems=res.items.slice(0,nk),lostItems=res.items.slice(nk);lostUnits+=lostItems.length;
   for(const it of keptItems){if(S.inv.length<S.invCap)S.inv.push(it);else{const m=salvageMats(it);for(const k in m)S.mats[k]=(S.mats[k]||0)+m[k]}}
+  setTimeout(()=>{try{cloudFlush()}catch(e){}},500);
   if(died&&charm)S.charm=null;
   S.best=Math.max(S.best,res.floor);S.cleared=Math.max(S.cleared||0,res.cleared||0);
   for(const m of res.maps||[])if(S.maps.length<30)S.maps.push(m);
@@ -2616,16 +2619,17 @@ function renderGuild(){const b=SB(),g=SOC.guild;if(!b||!g||S.tab!=='social'||(S.
   $('#gCopy').onclick=()=>{const t=`Join my Delvesmith guild "${g.name}" with code ${g.code}: ${location.href.split('#')[0]}`;try{navigator.clipboard.writeText(t);toast('Invite copied')}catch(e){toast('Code: '+g.code)}};
   document.querySelectorAll('[data-kick]').forEach(x=>x.onclick=()=>modal('Kick member?','They can rejoin with the code unless you change guilds.',[{label:'Kick',cls:'danger',fn:()=>kick(x.dataset.kick)},{label:'Cancel',cls:'ghost'}]))}
 // ---------- market
-function marketView(){const F=FB.F;renderMarket();
-  SOC.unsub.push(F.onSnapshot(F.query(F.collection(FB.db,'trades'),F.where('status','==','open'),F.limit(80)),sn=>{SOC.market=sn.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.at||0)-(a.at||0));renderMarket()},()=>{}));
+function mktSub(){const F=FB.F;if(SOC.mUnsub){try{SOC.mUnsub()}catch(e){}}SOC.mLim=SOC.mLim||20;
+  SOC.mUnsub=F.onSnapshot(F.query(F.collection(FB.db,'trades'),F.where('status','==','open'),F.limit(SOC.mLim)),sn=>{SOC.market=sn.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.at||0)-(a.at||0));SOC.mFull=sn.docs.length>=SOC.mLim;renderMarket()},()=>{});SOC.unsub.push(()=>{try{SOC.mUnsub&&SOC.mUnsub()}catch(e){}SOC.mUnsub=null})}
+function marketView(){const F=FB.F;SOC.mLim=20;renderMarket();mktSub();
   SOC.unsub.push(F.onSnapshot(F.query(F.collection(FB.db,'trades'),F.where('seller','==',fbUser.uid)),sn=>{SOC.mine=sn.docs.map(d=>({id:d.id,...d.data()})).filter(t=>t.seller===fbUser.uid);renderMarket();claimSales()},()=>{}))}
 function renderMarket(){const b=SB();if(!b||S.tab!=='social'||(S.socTab||'guild')!=='market')return;
   const vis=SOC.market.filter(t=>t.seller!==fbUser.uid&&(!t.guildOnly||(S.guild&&t.guild===S.guild)));
   const row=(t,mine)=>`<div class="slotrow" data-tr="${t.id}"><div style="flex:1;min-width:0"><div class="sl">${SLOTN[t.item.slot]||''} · ${mine?({open:'listed',sold:'sold, collecting…',cancelled:'cancelled'}[t.status]||t.status):'from '+esc(t.sellerName)}${t.guildOnly?' · guild only':''}</div><div class="nm r${t.item.rarity}">${esc(itemName(t.item))}</div><div class="meta">ilvl ${t.item.ilvl} · ${t.item.mods.length} mods</div><div style="margin-top:4px">${priceHTML(t.price)}</div></div><span class="note">›</span></div>`;
   b.innerHTML=`<div class="card"><h3>Sell an item</h3><div class="note" style="margin-bottom:8px">List gear for currency or materials. It leaves your inventory while listed, and you're paid automatically when it sells. Cancel any time before then to get it back.</div><button class="btn" id="mSell">List an item</button></div>
    ${SOC.mine.length?`<div class="card"><h3>Your listings</h3>${SOC.mine.map(t=>row(t,true)).join('')}</div>`:''}
-   <div class="card"><h3>For sale · ${vis.length}</h3>${vis.length?vis.map(t=>row(t,false)).join(''):'<div class="note">Nothing listed yet.</div>'}</div>`;
-  $('#mSell').onclick=sellPicker;
+   <div class="card"><h3>For sale · ${vis.length}${SOC.mFull?'+':''}</h3>${vis.length?vis.map(t=>row(t,false)).join(''):'<div class="note">Nothing listed yet.</div>'}${SOC.mFull?'<button class="btn ghost" id="mMore" style="margin-top:8px">Load 20 more</button>':''}</div>`;
+  $('#mSell').onclick=sellPicker;if($('#mMore'))$('#mMore').onclick=()=>{SOC.mLim+=20;mktSub()};
   document.querySelectorAll('[data-tr]').forEach(e=>e.onclick=()=>{const id=e.dataset.tr,t=SOC.market.find(x=>x.id===id)||SOC.mine.find(x=>x.id===id);if(t)tradeModal(t)})}
 function sellPicker(){const its=S.inv.filter(i=>!i.fav);if(!its.length){toast('No items to sell (favorites are protected)');return}
   modal('Pick an item to sell',its.map(i=>`<div class="slotrow" data-si="${i.uid}"><div><div class="sl">${SLOTN[i.slot]}</div><div class="nm r${i.rarity}">${esc(itemName(i))}</div><div class="meta">ilvl ${i.ilvl} · ${i.mods.length} mods</div></div></div>`).join(''),[{label:'Cancel',cls:'ghost'}]);
