@@ -213,7 +213,7 @@ const SKILLS={
   quake:{n:'Earthquake',cd:12,d:'After 1 second the ground erupts for 300% in a wide area.'},
   iron:{n:'Iron Skin',cd:14,d:'Take 40% less damage for 6 seconds.'},
   fireball:{n:'Fireball',cd:4,d:'A blazing orb that explodes for 200% in an area.'},
-  nova:{n:'Frost Nova',cd:8,d:'120% to everything nearby and slow them 50% for 3 seconds.'},
+  nova:{n:'Frost Nova',cd:8,d:'120% to everything nearby and slow them 50% for 3 seconds. With nothing close, it erupts around the nearest enemy in range.'},
   heal:{n:'Mend',cd:20,d:'Restore 30% of your Life.'},
   flurry:{n:'Flurry',cd:5,d:'6 lightning-fast stabs for 60% each.'},
   shadow:{n:'Shadow Step',cd:7,d:'Teleport behind an enemy and land a guaranteed crit for 250%.'},
@@ -370,7 +370,7 @@ const DOTC={B:'#ff5a5a',P:'#8fe36b',F:'#ffa040',C:'#9fdcff'};
 const SKN={fireball:{fire:'Fireball',cold:'Frost Bolt',poison:'Plague Bolt'},nova:{fire:'Fire Nova',cold:'Frost Nova',poison:'Toxic Nova'}};
 const SKD={fireball:{cold:'An icy orb that bursts for 200% in an area. Frost hits slow enemies.',poison:'A toxic orb that bursts for 200% in an area. Poison hits stack up to 5 times.'},
   nova:{fire:'160% fire damage to everything nearby and sets them ablaze with a double-strength burn.',cold:'160% cold damage to everything nearby and freezes them solid for 1.5 seconds.',poison:'140% poison damage to everything nearby and adds 3 poison stacks.'}};
-const skD=(k,el)=>(SKD[k]&&el&&SKD[k][el])||SKILLS[k].d;
+const skD=(k,el)=>(SKD[k]&&el&&SKD[k][el])?SKD[k][el]+(k==='nova'?' With nothing close, it erupts around the nearest enemy in range.':''):SKILLS[k].d;
 const STN={staff_splitfire:{n:{fire:'Split Fire',cold:'Split Frost',poison:'Split Plague',_:'Split Bolt'},d:b=>`${b} splits into 3 orbs that each deal 120%.`},
   staff_deepfreeze:{n:{cold:'Deep Freeze',fire:'Searing Nova',poison:'Paralytic Nova',_:'Deep Freeze'},d:(b,nv,el)=>el==='cold'?`Frost Nova freezes enemies for longer (2 seconds instead of 1.5).`:`${nv} also stuns enemies in place for 1 second.`},
   staff_splitfire_power:{n:{fire:'Inferno',cold:'Hailstone',poison:'Virulence',_:'Overload'}},staff_splitfire_dot:{n:{fire:'Ignite',cold:'Frostbite',poison:'Festering',_:'Ignite'}},
@@ -956,6 +956,7 @@ class Sim{
   cleanup(){this.L.enemies=this.L.enemies.filter(e=>e.hp>0)}
   ring(x,y,r,c,dur){if(this.visual)this.L.rings.push({x,y,r,c,t:0,max:dur||.35})}
   aoe(x,y,r,mult,extra,c){r*=(1+(this.st.areaInc||0)/100)*(this.curSpec==='wide'?1.35:1);for(const e of this.near(r,x,y)){this.hitEnemy(e,mult);if(extra&&e.hp>0)extra(e);if(this.done)return}this.cleanup();this.ring(x,y,r,c||'#ffffff')}
+  novaAt(rng){const c=this.pc();if(this.near(100,c.x,c.y).length)return{x:c.x,y:c.y};const t=this.nearest(rng,true);return t?{x:t.x+t.w/2,y:t.y+t.h/2,far:1,t}:null}
   nearest(maxD,needLos){const c=this.pc();let b=null,bd=1e9;for(const e of this.L.enemies){if(e.hp<=0)continue;const d=Math.hypot(e.x+e.w/2-c.x,e.y+e.h/2-c.y);if(d<maxD&&d<bd&&(!needLos||los(this.L,c.x,c.y,e.x+e.w/2,e.y+e.h/2,4))){bd=d;b=e}}return b}
   shoot(kind,ang,mult,aoe){this.sfx(kind==='arrow'?'arrow':kind==='fireball'?({cold:'frost',poison:'toxic'}[this.st.sEl]||'fire'):'bolt');const c=this.pc(),sp=kind==='arrow'?520:kind==='bolt'?430:360;this.L.pshots.push({kind,el:this.st.sEl,x:c.x+Math.cos(ang)*12,y:c.y+Math.sin(ang)*12,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,mult,aoe:aoe||0,life:1.2})}
   specOf(id){const M=this.st.m||{};for(const [c] of SPECS[id]||[])if(M['sp_'+id+'_'+c])return c;return null}
@@ -987,11 +988,11 @@ class Sim{
       case 'quake':{const x=c.x,y=c.y,R=M.fault?180:120;this.ring(x,y,R*(1+(this.st.areaInc||0)/100),'#ff9a4a',1);this.ev.push({at:this.t+1,f:()=>this.aoe(x,y,R,3,null,'#ffb070')});break}
       case 'iron':this.buff.iron=6;break;
       case 'fireball':{t=this.nearest(rng,true);if(!t)return 'No target in sight';p.ang=ang(t);p.swing=p.swingMax=.24;if(M.splitfire){for(const o of [-.28,0,.28])this.shoot('fireball',p.ang+o,1.2,50)}else this.shoot('fireball',p.ang,2,60);break}
-      case 'nova':{if(!this.near(100,c.x,c.y).length)return 'No enemies nearby';const el=this.st.sEl;
-        if(el==='cold')this.aoe(c.x,c.y,100,1.6,e=>{e.slow=3;e.stun=Math.max(e.stun||0,(e.boss?(M.deepfreeze?.6:.4):(M.deepfreeze?2:1.5))+(this.st.att==='cold'?(e.boss?.3:1):0))},'#bfe8ff');
-        else if(el==='fire')this.aoe(c.x,c.y,100,1.6,e=>{if(e.burnU>this.t)e.burnD*=2;if(M.deepfreeze)e.stun=Math.max(e.stun||0,e.boss?.3:1)},'#ff9a4a');
-        else if(el==='poison')this.aoe(c.x,c.y,100,1.4,e=>{if(e.poisU>this.t)e.poisS=Math.min(this.st.att==='poison'?8:5,e.poisS+2);if(M.deepfreeze)e.stun=Math.max(e.stun||0,e.boss?.3:1)},'#8fe36b');
-        else this.aoe(c.x,c.y,100,1.2,e=>{e.slow=3;if(M.deepfreeze)e.stun=Math.max(e.stun||0,e.boss?.3:1)},'#8fd3ff');break}
+      case 'nova':{const nc=this.novaAt(rng);if(!nc)return 'No enemies in range';const el=this.st.sEl;if(nc.far){const k=this.L.rings;k.push({x:c.x,y:c.y,r:14,c:'#cfc6dc',t:0,max:.2})}
+        if(el==='cold')this.aoe(nc.x,nc.y,100,1.6,e=>{e.slow=3;e.stun=Math.max(e.stun||0,(e.boss?(M.deepfreeze?.6:.4):(M.deepfreeze?2:1.5))+(this.st.att==='cold'?(e.boss?.3:1):0))},'#bfe8ff');
+        else if(el==='fire')this.aoe(nc.x,nc.y,100,1.6,e=>{if(e.burnU>this.t)e.burnD*=2;if(M.deepfreeze)e.stun=Math.max(e.stun||0,e.boss?.3:1)},'#ff9a4a');
+        else if(el==='poison')this.aoe(nc.x,nc.y,100,1.4,e=>{if(e.poisU>this.t)e.poisS=Math.min(this.st.att==='poison'?8:5,e.poisS+2);if(M.deepfreeze)e.stun=Math.max(e.stun||0,e.boss?.3:1)},'#8fe36b');
+        else this.aoe(nc.x,nc.y,100,1.2,e=>{e.slow=3;if(M.deepfreeze)e.stun=Math.max(e.stun||0,e.boss?.3:1)},'#8fd3ff');break}
       case 'heal':{if(this.life>=this.st.life)return 'Already at full Life';this.life=Math.min(this.st.life,this.life+this.st.life*.3);if(M.regrowth)this.buff.regrow=5;this.pfx(c.x,c.y,'#7ee36b',16,120);this.ring(c.x,c.y,40,'#7ee36b',.5);break}
       case 'flurry':{t=this.nearest(this.P.w/2+30+wc.reach,false);if(!t)return 'No enemy in reach';const tt=t,n=M.thousand?9:6;p.ang=ang(t);p.channel=n*.1;for(let i=0;i<n;i++)this.ev.push({at:this.t+i*.1,f:()=>{if(tt.hp>0){p.swing=p.swingMax=.09;p.alt=!p.alt;this.hitEnemy(tt,.6);this.cleanup()}}});break}
       case 'shadow':{t=this.nearest(5*TS,false);if(!t)return 'No target within 5 tiles';const a=ang(t),tx=t.x+t.w/2+Math.cos(a)*(t.w/2+14),ty=t.y+t.h/2+Math.sin(a)*(t.h/2+14);
@@ -1042,7 +1043,7 @@ class Sim{
       case 'slam':return this.near(90,c.x,c.y).length>=2||this.near(90,c.x,c.y).some(e=>e.champ);
       case 'quake':return this.near(110,c.x,c.y).length>=2;
       case 'fireball':case 'multi':return !!this.nearest(rng,true);
-      case 'nova':return this.near(100,c.x,c.y).length>=2||this.near(50,c.x,c.y).length>0;
+      case 'nova':{if(this.near(100,c.x,c.y).length>=2||this.near(50,c.x,c.y).length>0)return true;const rr=(this.wc().range||4.5)*TS*(1+(this.st.rangeInc||0)/100),nc=this.novaAt(rr);return !!(nc&&nc.far&&(this.near(100,nc.x,nc.y).length>=2||nc.t.boss||nc.t.champ))}
       case 'heal':return hp<.6||(hp<.8&&this.near(3*TS,c.x,c.y).some(e=>e.boss||e.champ));
       case 'shadow':return ag(5*TS)>0&&!!this.nearest(5*TS,false);
       case 'smoke':{const n=ag(2.5*TS);return n>=2||(n>0&&(hp<.75||this.near(2.5*TS,c.x,c.y).some(e=>e.champ||e.boss)))}
