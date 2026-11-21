@@ -1209,7 +1209,7 @@ class Sim{
       if(rectSolid(L,tx-9,ty-9,18,18)||s.dangerAt(tx,ty)||!los(L,pcx,pcy,tx,ty,8))continue;let sc=-R+Math.hypot(tx-dz.x,ty-dz.y)*.3;if(goal)sc-=Math.hypot(tx-goal.x,ty-goal.y)*.05;if(sc>bs){bs=sc;dodge={x:tx,y:ty}}}if(dodge)break}
       if(dodge){atkE=null;atkN=null}}}
     if((atkE||atkN)&&p.atkCd<=0&&!(p.channel>0)&&!p.dash){
-      p.atkCd=1/(st.aps*(st.berserk&&s.life<st.life*.5?1.2:1)*(st.bloodlust&&s.t<(s.bloodT||0)?1+.05*(s.blood||0):1));p.swing=p.swingMax=wc.swing;p.alt=!p.alt;
+      p.atkCd=1/(st.aps*(st.berserk&&s.life<st.life*.5?1.2:1)*(st.bloodlust&&s.t<(s.bloodT||0)?1+.05*(s.blood||0):1));p.swing=p.swingMax=wc.swing;p.alt=!p.alt;if(atkN&&!atkE){p.pick=1;p.pickT=s.t}else if(atkE)p.pick=0;
       if(atkE){const dd=Math.hypot(atkE.x+atkE.w/2-pcx,atkE.y+atkE.h/2-pcy);if(wc.range&&dd>p.w/2+Math.max(atkE.w,atkE.h)/2+wc.reach+4){s.shoot(wc.range&&s.st.wclass==='bow'?'arrow':'bolt',p.ang,null);if(st.surge&&st.wclass==='staff'&&(s.surgeN=(s.surgeN||0)+1)%4===0){s.shoot('bolt',p.ang-.25,null);s.shoot('bolt',p.ang+.25,null)}}else s.hitEnemy(atkE)}
       else{atkN.hp--;atkN.hurt=.12;s.sfx('mine');s.pfx(atkN.x+14,atkN.y+12,'#8d8076',6);
         if(atkN.hp<=0){s.pfx(atkN.x+14,atkN.y+12,B.ore,14,160);s.mats(B.oreMat(s.rng()),2,atkN.x+14,atkN.y)}}
@@ -2155,6 +2155,14 @@ $('#pullBtn').onclick=()=>{if(sim&&mode==='live'&&sim.state==='retreat'&&!sim.pu
 const cv=$('#cv'),ctx=cv.getContext('2d');let dpr=1,scale=1;
 function resize(){const r=$('#canvasWrap').getBoundingClientRect();dpr=Math.min(window.devicePixelRatio||1,2.5);cv.width=Math.max(1,Math.round(r.width*dpr));cv.height=Math.max(1,Math.round(r.height*dpr));scale=clamp(Math.min(r.width/(10*TS),r.height/(10*TS)),.6,1.6)}
 window.addEventListener('resize',resize);
+function drawPickaxe(x,y,a,k){const sw=k<0?-.5:(k<.45?-1.5+k/.45*.3:-1.2+(k-.45)/.55*2.3),an=a+sw*(Math.cos(a)>=0?1:-1),hx=x+Math.cos(an)*22,hy=y+Math.sin(an)*22,pa=an+Math.PI/2;
+  ctx.lineCap='round';ctx.strokeStyle='#7a5532';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(x+Math.cos(an)*3,y+Math.sin(an)*3);ctx.lineTo(hx,hy);ctx.stroke();
+  ctx.strokeStyle='#5a3d22';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x+Math.cos(an)*6,y+Math.sin(an)*6);ctx.lineTo(x+Math.cos(an)*9,y+Math.sin(an)*9);ctx.stroke();
+  ctx.fillStyle='#b8b4c0';ctx.strokeStyle='#6c6878';ctx.lineWidth=1;ctx.beginPath();
+  const c=(d,o)=>[hx+Math.cos(pa)*d+Math.cos(an)*o,hy+Math.sin(pa)*d+Math.sin(an)*o];
+  const P0=c(-11,-4),P1=c(-4,2),P2=c(4,2),P3=c(11,-4),P4=c(3,-1),P5=c(-3,-1);
+  ctx.moveTo(...P0);ctx.quadraticCurveTo(...c(-6,3),...P1);ctx.lineTo(...P2);ctx.quadraticCurveTo(...c(6,3),...P3);ctx.lineTo(...P4);ctx.lineTo(...P5);ctx.closePath();ctx.fill();ctx.stroke();
+  ctx.fillStyle='#e8e4f0';ctx.beginPath();ctx.arc(...c(-10.5,-3.6),1,0,7);ctx.arc(...c(10.5,-3.6),1,0,7);ctx.fill()}
 function drawWeapon(cls,x,y,a,k,alt,wc){
   // k: -1 idle, 0..1 attack progress
   ctx.lineCap='round';ctx.strokeStyle=wc;ctx.fillStyle=wc;
@@ -2456,10 +2464,11 @@ function draw(){
    if(s.buff.smoke>0){ctx.fillStyle='rgba(90,84,102,.45)';for(let i=0;i<5;i++){const aa=s.t*2+i*1.256;ctx.beginPath();ctx.arc(bx+Math.cos(aa)*12,by+Math.sin(aa)*10,9,0,7);ctx.fill()}}
    if(s.buff.whirl>0){ctx.strokeStyle=wcol;ctx.lineWidth=3;for(let i=0;i<3;i++){const aa=s.t*18+i*2.09;ctx.beginPath();ctx.moveTo(bx+Math.cos(aa)*8,by+Math.sin(aa)*8);ctx.lineTo(bx+Math.cos(aa)*28,by+Math.sin(aa)*28);ctx.stroke()}ctx.globalAlpha=.2;ctx.beginPath();ctx.arc(bx,by,28,0,7);ctx.stroke();ctx.globalAlpha=1}
    if(s.buff.haste>0){ctx.strokeStyle='rgba(126,227,107,.5)';ctx.lineWidth=2;for(let i=-1;i<=1;i++){ctx.beginPath();ctx.moveTo(bx-Math.cos(a)*12+i*4,by-Math.sin(a)*12+i*4);ctx.lineTo(bx-Math.cos(a)*24+i*4,by-Math.sin(a)*24+i*4);ctx.stroke()}}
-   const behind=Math.sin(a)<-.3;if(behind&&!(s.buff.whirl>0))drawWeapon(cls,bx,by,a,k,P.alt,wcol);
+   const mining=P.pick&&s.t-(P.pickT||0)<1.2,pk=(s.t-(P.pickT||0))/.35,dw=()=>mining?drawPickaxe(bx,by,a,pk<1?pk:-1):drawWeapon(cls,bx,by,a,k,P.alt,wcol);
+   const behind=Math.sin(a)<-.3;if(behind&&!(s.buff.whirl>0))dw();
    drawHero(bx,by,a,P.walk,P.hurt>0,S.eq);
-   if(!behind&&!(s.buff.whirl>0))drawWeapon(cls,bx,by,a,k,P.alt,wcol);
-   if(cls==='hammer'&&k>=.78&&!P.slamFx){P.slamFx=1;L.rings.push({x:bx+Math.cos(a)*30,y:by+Math.sin(a)*30,r:26,c:'#d8c8a8',t:0,max:.3})}if(k<.5)P.slamFx=0;
+   if(!behind&&!(s.buff.whirl>0))dw();
+   if(cls==='hammer'&&!mining&&k>=.78&&!P.slamFx){P.slamFx=1;L.rings.push({x:bx+Math.cos(a)*30,y:by+Math.sin(a)*30,r:26,c:'#d8c8a8',t:0,max:.3})}if(k<.5)P.slamFx=0;
    if(s.state==='retreat'){ctx.fillStyle='#ff9a7a';ctx.fillText('RETREATING',pcx,P.y-14)}}
   for(const q of L.pshots){if(q.kind==='arrow'){const a=Math.atan2(q.vy,q.vx);ctx.strokeStyle='#e8e2d6';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(q.x,q.y);ctx.lineTo(q.x-Math.cos(a)*14,q.y-Math.sin(a)*14);ctx.stroke();ctx.fillStyle='#e8e2d6';ctx.beginPath();ctx.arc(q.x,q.y,2.5,0,7);ctx.fill()}
     else{const big=q.kind==='fireball',E=q.el&&EL[q.el];ctx.fillStyle=E?E.g:big?'rgba(255,140,50,.35)':'rgba(180,140,255,.35)';ctx.beginPath();ctx.arc(q.x,q.y,big?12:8,0,7);ctx.fill();ctx.fillStyle=E?E.core:big?'#ffd070':'#e6d8ff';ctx.beginPath();ctx.arc(q.x,q.y,big?6:4,0,7);ctx.fill()}}
