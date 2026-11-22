@@ -1214,7 +1214,7 @@ class Sim{
       if(rectSolid(L,tx-9,ty-9,18,18)||s.dangerAt(tx,ty)||!los(L,pcx,pcy,tx,ty,8))continue;let sc=-R+Math.hypot(tx-dz.x,ty-dz.y)*.3;if(goal)sc-=Math.hypot(tx-goal.x,ty-goal.y)*.05;if(sc>bs){bs=sc;dodge={x:tx,y:ty}}}if(dodge)break}
       if(dodge){atkE=null;atkN=null;p.dg={x:dodge.x,y:dodge.y,t:s.t+1.5}}}}
     if((atkE||atkN)&&p.atkCd<=0&&!(p.channel>0)&&!p.dash){
-      p.atkCd=1/(st.aps*(st.berserk&&s.life<st.life*.5?1.2:1)*(st.bloodlust&&s.t<(s.bloodT||0)?1+.05*(s.blood||0):1));p.swing=p.swingMax=Math.min(wc.swing,p.atkCd*.85);p.alt=!p.alt;if(atkN&&!atkE){p.pick=1;p.pickT=s.t}else if(atkE)p.pick=0;
+      p.atkCd=Math.max(p.atkCd,-dt)+1/(st.aps*(st.berserk&&s.life<st.life*.5?1.2:1)*(st.bloodlust&&s.t<(s.bloodT||0)?1+.05*(s.blood||0):1));p.swing=p.swingMax=Math.min(wc.swing,p.atkCd*.85);p.alt=!p.alt;if(atkN&&!atkE){p.pick=1;p.pickT=s.t}else if(atkE)p.pick=0;
       if(atkE){const dd=Math.hypot(atkE.x+atkE.w/2-pcx,atkE.y+atkE.h/2-pcy);if(wc.range&&dd>p.w/2+Math.max(atkE.w,atkE.h)/2+wc.reach+4){s.shoot(wc.range&&s.st.wclass==='bow'?'arrow':'bolt',p.ang,null);if(st.surge&&st.wclass==='staff'&&(s.surgeN=(s.surgeN||0)+1)%4===0){s.shoot('bolt',p.ang-.25,null);s.shoot('bolt',p.ang+.25,null)}}else s.hitEnemy(atkE)}
       else{atkN.hp--;atkN.hurt=.12;s.sfx('mine');s.pfx(atkN.x+14,atkN.y+12,'#8d8076',6);
         if(atkN.hp<=0){s.pfx(atkN.x+14,atkN.y+12,B.ore,14,160);s.mats(B.oreMat(s.rng()),2,atkN.x+14,atkN.y)}}
