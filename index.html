@@ -1588,11 +1588,11 @@ function collectAdv(a){const m=a.mis;if(!m||Date.now()<m.end)return;const R=Math
   h+=`<div class="note" style="margin-top:6px">+${out.xp} XP${out.lv.length?` · <b>Level ${out.lv[out.lv.length-1]}!</b>`:''}${out.trait?` · New trait: <b>${out.trait[1]}</b> (${out.trait[2]})`:''}</div>`;
   SFX.play(res==='success'?'escape':'hurt');modal(`${a.name} is back`,h,[{label:'Nice',fn:render}])}
 function advGearPick(a,slot){const S0=ADV_SLOTS.find(x=>x[0]===slot),used=ADV_SLOTS.filter(([k])=>k!==slot&&a.gear[k]).map(([k])=>a.gear[k].slot),ok=it=>!used.includes(it.slot)||(it.slot==='ring'&&used.filter(x=>x==='ring').length<2);
-  const pre=S.inv.filter(it=>S0[2](it)&&!it.fav&&ok(it)).sort((x,y)=>y.ilvl-x.ilvl+((y.emp||0)-(x.emp||0))*3).slice(0,40),cands=pre.map(it=>({it,dep:advDepth(a,{...a.gear,[slot]:it})})).sort((x,y)=>y.dep-x.dep);
+  const pre=S.inv.filter(it=>S0[2](it)&&!it.fav&&ok(it)).sort((x,y)=>y.ilvl-x.ilvl+((y.emp||0)-(x.emp||0))*3).slice(0,40),cands=pre.map(it=>({it,dep:advDepth(a,{...a.gear,[slot]:it})})).sort((x,y)=>(y.it.adv?1:0)-(x.it.adv?1:0)||y.dep-x.dep);
   let h=`<div class="note" style="margin-bottom:8px">Gear given to adventurers leaves your inventory and can break on missions. Favorited items can't be used. Empowered items break less often.</div>`;
   if(a.gear[slot])h+=`<button class="btn ghost" data-ag="__un">Take back ${itemName(a.gear[slot])}</button>`;
   const cur=advDepth(a);h+=`<div class="note" style="margin-bottom:6px">${a.name} handles about depth <b>${cur}</b> now. The number on each item is the depth they'd handle with it. Good damage on weapons and Life, Armour and resistances on armour count; filler modifiers don't.</div>`;
-  h+=cands.length?cands.map(({it,dep})=>`<button class="btn ghost" style="display:flex;justify-content:space-between;text-align:left;margin-top:6px" data-ag="${it.uid}"><span style="color:${RCOL[it.rarity]}">${itemName(it)}<br><small style="color:#9a90a8">${BASES[it.base].n} · ilvl ${it.ilvl}</small></span><b style="color:${dep>cur?'#5dd68c':dep<cur?'#ff8a7a':'#cfc6dc'}">${dep}</b></button>`).join(''):'<div class="note">No suitable items in your inventory.</div>';
+  h+=cands.length?cands.map(({it,dep})=>`<button class="btn ghost" style="display:flex;justify-content:space-between;text-align:left;margin-top:6px" data-ag="${it.uid}"><span style="color:${RCOL[it.rarity]}">${it.adv?'<span style="color:#8fd3ff">⚔ </span>':''}${itemName(it)}<br><small style="color:#9a90a8">${BASES[it.base].n} · ilvl ${it.ilvl}</small></span><b style="color:${dep>cur?'#5dd68c':dep<cur?'#ff8a7a':'#cfc6dc'}">${dep}</b></button>`).join(''):'<div class="note">No suitable items in your inventory.</div>';
   modal(`${a.name}: ${S0[1]}`,h,[{label:'Close',cls:'ghost'}]);
   document.querySelectorAll('[data-ag]').forEach(b=>b.onclick=()=>{const v=b.dataset.ag;if(v==='__un'){if(S.inv.length>=S.invCap){toast('Inventory full');return}S.inv.push(a.gear[slot]);delete a.gear[slot]}
     else{const it=S.inv.find(i=>String(i.uid)===v);if(!it)return;if(a.gear[slot]){if(S.inv.length>=S.invCap+1){toast('Inventory full');return}S.inv.push(a.gear[slot])}S.inv=S.inv.filter(i=>i!==it);a.gear[slot]=it}
@@ -1809,7 +1809,7 @@ function updIdleCard(){
 const SORTS={recent:'Newest first',old:'Oldest first',rarity:'Rarity',ilvl:'Item level',dps:'Highest DPS (weapons)',armour:'Highest armour',slot:'Slot',fav:'Favorites first',emp:'Empower level'};
 let invQ='';
 const RNAME=['normal','magic','rare','unique'];
-function itemText(it){const b=BASES[it.base];let t=[itemName(it),b.n,SLOTN[it.slot],RNAME[it.rarity],b.cls||'',it.fav?'favorite':'',it.emp?'empowered':''];
+function itemText(it){const b=BASES[it.base];let t=[itemName(it),b.n,SLOTN[it.slot],RNAME[it.rarity],b.cls||'',it.fav?'favorite':'',it.adv?'adventurer saved':'',it.emp?'empowered':''];
   if(b.imp)for(const k in b.imp)t.push(DESC[k](b.imp[k]));for(const m of it.mods)t.push(DESC[m.a](m.v));if(it.uq)t.push(UNIQ[it.uq].n||'',UNIQ[it.uq].d);
   return t.join(' ').replace(/<[^>]*>/g,'').toLowerCase()}
 function invMatch(it){const q=invQ.trim().toLowerCase();if(!q)return true;const t=itemText(it);return q.split(/\s+/).every(w=>t.includes(w))}
@@ -1822,7 +1822,7 @@ function sortedInv(){const k=S.invSort||'recent',a=S.inv.map((it,i)=>({it,i}));c
   return a.sort((p,q)=>by(p)-by(q)||q.i-p.i).map(x=>x.it)}
 function slotRow(it,sl){
   if(!it)return `<div class="slotrow"><div><div class="sl">${SLOTN[sl]}</div><div class="nm note">Empty</div></div></div>`;
-  return `<div class="slotrow" data-item="${it.uid}" data-iu="${it.uid}"><div><div class="sl">${SLOTN[it.slot]}${idleLocked(it)?' · locked':''}</div><div class="nm r${it.rarity}">${it.fav?'<span style="color:#ffd36a">★ </span>':''}${itemName(it)}</div><div class="meta">${it.rarity===2?BASES[it.base].n+' · ':''}ilvl ${it.ilvl} · ${it.mods.length} mods</div></div><span class="note">›</span></div>`;
+  return `<div class="slotrow" data-item="${it.uid}" data-iu="${it.uid}"><div><div class="sl">${SLOTN[it.slot]}${idleLocked(it)?' · locked':''}</div><div class="nm r${it.rarity}">${it.fav?'<span style="color:#ffd36a">★ </span>':''}${it.adv?'<span style="color:#8fd3ff">⚔ </span>':''}${itemName(it)}</div><div class="meta">${it.rarity===2?BASES[it.base].n+' · ':''}ilvl ${it.ilvl} · ${it.mods.length} mods</div></div><span class="note">›</span></div>`;
 }
 const BEST_W={balanced:[.65,.35,'Balanced'],damage:[.9,.1,'Damage'],survival:[.3,.7,'Survival']};
 function gearParts(eq,f){const st=computeStats(eq),sp=bsplit(f),raw=mDMG(f)*1.5;let taken=0;
@@ -1896,15 +1896,15 @@ function viewGear(){
   const iq=$('#invQ');if(iq)iq.oninput=e=>{invQ=e.target.value;applyInvFilter()};applyInvFilter();
   document.querySelectorAll('[data-pick]').forEach(e=>e.onclick=()=>{const u=+e.dataset.pick;picked.has(u)?picked.delete(u):picked.add(u);keep()});
   document.querySelectorAll('[data-pk]').forEach(b=>b.onclick=()=>{const k=b.dataset.pk;if(k==='none'){picked.clear();keep();return}const g=pkGroup(k),on=g.length&&g.every(i=>picked.has(i.uid));g.forEach(i=>on?picked.delete(i.uid):picked.add(i.uid));keep()});
-  const sa=$('#salvAll');if(sa)holdBtn(sa,1000,()=>{for(const i of S.inv)if(i.fav)picked.delete(i.uid);const its=S.inv.filter(i=>picked.has(i.uid)),rares=its.filter(i=>i.rarity===2);
+  const sa=$('#salvAll');if(sa)holdBtn(sa,1000,()=>{for(const i of S.inv)if(i.fav||i.adv)picked.delete(i.uid);const its=S.inv.filter(i=>picked.has(i.uid)),rares=its.filter(i=>i.rarity===2);
     const go=()=>{const tot={};for(const it of its){const m=salvageMats(it);for(const k in m){tot[k]=(tot[k]||0)+m[k];S.mats[k]=(S.mats[k]||0)+m[k]}}
       S.inv=S.inv.filter(i=>!picked.has(i.uid));picked.clear();selMode=false;persist();keep();toast(`Salvaged ${its.length} item${its.length===1?'':'s'}: `+Object.entries(tot).map(([k,v])=>`${v} ${MATS[k].n}`).join(', '))};
     if(rares.length)modal('Salvage Rares too?',`Your selection includes <b>${rares.length}</b> Rare item${rares.length===1?'':'s'}:<div class="chips" style="margin-top:8px">${rares.map(i=>`<span class="chip r2">${itemName(i)}</span>`).join('')}</div>`,[{label:`Hold to salvage all ${its.length}`,cls:'danger',hold:1,fn:go},{label:'Cancel',cls:'ghost'}]);
     else go()});
 }
 let selMode=false;const picked=new Set();
-function pkGroup(k){return S.inv.filter(i=>!i.fav&&invMatch(i)&&(k==='all'||i.rarity===+k))}
-function pickRow(it){if(it.fav)return `<div class="slotrow" style="opacity:.45" data-iu="${it.uid}"><div style="display:flex;gap:10px;align-items:center"><span class="cb" style="color:#ffd36a">★</span><div><div class="sl">${SLOTN[it.slot]} · favorite, can't salvage</div><div class="nm r${it.rarity}">${itemName(it)}</div></div></div></div>`;const on=picked.has(it.uid);return `<div class="slotrow ${on?'picked':''}" data-pick="${it.uid}" data-iu="${it.uid}"><div style="display:flex;gap:10px;align-items:center"><span class="cb">${on?'✓':''}</span><div><div class="sl">${SLOTN[it.slot]}</div><div class="nm r${it.rarity}">${itemName(it)}</div><div class="meta">${it.rarity===2?BASES[it.base].n+' · ':''}ilvl ${it.ilvl} · ${it.mods.length} mods</div></div></div></div>`}
+function pkGroup(k){return S.inv.filter(i=>!i.fav&&!i.adv&&invMatch(i)&&(k==='all'||i.rarity===+k))}
+function pickRow(it){if(it.fav||it.adv)return `<div class="slotrow" style="opacity:.45" data-iu="${it.uid}"><div style="display:flex;gap:10px;align-items:center"><span class="cb" style="color:${it.fav?'#ffd36a':'#8fd3ff'}">${it.fav?'★':'⚔'}</span><div><div class="sl">${SLOTN[it.slot]} · ${it.fav?'favorite':'saved for adventurers'}, can't salvage</div><div class="nm r${it.rarity}">${itemName(it)}</div></div></div></div>`;const on=picked.has(it.uid);return `<div class="slotrow ${on?'picked':''}" data-pick="${it.uid}" data-iu="${it.uid}"><div style="display:flex;gap:10px;align-items:center"><span class="cb">${on?'✓':''}</span><div><div class="sl">${SLOTN[it.slot]}</div><div class="nm r${it.rarity}">${itemName(it)}</div><div class="meta">${it.rarity===2?BASES[it.base].n+' · ':''}ilvl ${it.ilvl} · ${it.mods.length} mods</div></div></div></div>`}
 function exportSave(){
   const code='DS2:'+b64e(JSON.stringify(S));
   modal('Your backup code',`<div class="note" style="margin-bottom:8px">Copy this code and keep it somewhere safe, like your Notes app or an email to yourself. Paste it into <b>Restore</b> on any device to get your progress back.</div>
@@ -1950,7 +1950,9 @@ function itemModal(it){
   btns.push({label:'Craft on this',cls:'blue',disabled:lock,fn:()=>{S.sel=it.uid;S.townTab='craft';setTab('refine')}});
   btns.push({label:`⬆ Empower (+${it.emp||0} → +${(it.emp||0)+1}, ${empChance(it.emp||0)}%)`,cls:'ghost',disabled:lock,fn:()=>goEmpower(it.uid)});
   btns.push({label:it.fav?'★ Remove favorite':'☆ Favorite (protect from salvage)',cls:'ghost',fn:()=>{it.fav=!it.fav;persist();render();toast(it.fav?'Favorited: it can\'t be salvaged':'Removed from favorites')}});
-  if(!eq&&!it.fav){const m=salvageMats(it);btns.push({label:'Hold to salvage for '+Object.entries(m).map(([k,v])=>v+' '+MATS[k].n).join(', '),cls:'ghost',hold:1,fn:()=>{S.inv=S.inv.filter(i=>i.uid!==it.uid);for(const k in m)S.mats[k]=(S.mats[k]||0)+m[k];persist();render();toast('Salvaged')}})}
+  if(!eq&&!it.adv)btns.push({label:'⚔ Save for adventurer (protect from salvage)',cls:'ghost',fn:()=>{it.adv=1;persist();render();toast('Saved for adventurers: it can\'t be salvaged')}});
+  else if(!eq&&it.adv)btns.push({label:'⚔ Remove adventurer save',cls:'ghost',fn:()=>{delete it.adv;persist();render();toast('No longer saved for adventurers')}});
+  if(!eq&&!it.fav&&!it.adv){const m=salvageMats(it);btns.push({label:'Hold to salvage for '+Object.entries(m).map(([k,v])=>v+' '+MATS[k].n).join(', '),cls:'ghost',hold:1,fn:()=>{S.inv=S.inv.filter(i=>i.uid!==it.uid);for(const k in m)S.mats[k]=(S.mats[k]||0)+m[k];persist();render();toast('Salvaged')}})}
   let cmp='';
   let diff='';if(!eq){const ks=it.slot==='ring'?(S.eq.ring&&S.eq.ring2?['ring','ring2']:[S.eq.ring?'ring2':'ring']):[it.slot];diff=ks.map(k=>swapDiff(it,k)).join('')}
   if(!eq){const cur=(it.slot==='ring'?['ring','ring2']:[it.slot]).map(k=>S.eq[k]).filter(Boolean);if(cur.length)cmp=`<div class="note" style="margin:10px 0 6px">Currently equipped:</div>`+cur.map(c=>itemHTML(c)).join('<div style="height:6px"></div>')}
@@ -1986,7 +1988,7 @@ function viewCraft(){
   document.querySelectorAll('[data-cur]').forEach(b=>b.onclick=()=>useCur(b.dataset.cur,it));
 }
 function itemPicker(items){const eqd=items.filter(isEquipped),inv=sortedInv().filter(i=>!isEquipped(i));
-  const row=i=>`<div class="slotrow" data-pi="${i.uid}" style="${i.uid===S.sel?'border-color:var(--accent)':''}"><div><div class="sl">${SLOTN[i.slot]}${isEquipped(i)?' · equipped':''}</div><div class="nm r${i.rarity}">${i.fav?'<span style="color:#ffd36a">★ </span>':''}${itemName(i)}</div><div class="meta">${i.rarity>=2?BASES[i.base].n+' · ':''}ilvl ${i.ilvl} · ${i.mods.length} mods</div></div></div>`;
+  const row=i=>`<div class="slotrow" data-pi="${i.uid}" style="${i.uid===S.sel?'border-color:var(--accent)':''}"><div><div class="sl">${SLOTN[i.slot]}${isEquipped(i)?' · equipped':''}</div><div class="nm r${i.rarity}">${i.fav?'<span style="color:#ffd36a">★ </span>':''}${i.adv?'<span style="color:#8fd3ff">⚔ </span>':''}${itemName(i)}</div><div class="meta">${i.rarity>=2?BASES[i.base].n+' · ':''}ilvl ${i.ilvl} · ${i.mods.length} mods</div></div></div>`;
   modal('Choose an item',(eqd.length?'<div class="note" style="margin-bottom:6px">EQUIPPED</div>'+eqd.map(row).join(''):'')+(inv.length?`<div class="note" style="margin:10px 0 6px">INVENTORY · sorted by ${SORTS[S.invSort||'recent'].toLowerCase()}</div>`+inv.map(row).join(''):''),[{label:'Close',cls:'ghost'}]);
   document.querySelectorAll('[data-pi]').forEach(e=>e.onclick=()=>{S.sel=+e.dataset.pi;$('#modal').classList.add('hidden');paused=false;persist();viewCraft()})}
 function canUse(k,it){
@@ -2741,7 +2743,7 @@ function renderMarket(){const b=SB();if(!b||S.tab!=='social'||(S.socTab||'guild'
    <div class="card"><h3>For sale · ${vis.length}${SOC.mFull?'+':''}</h3>${vis.length?vis.map(t=>row(t,false)).join(''):'<div class="note">Nothing listed yet.</div>'}${SOC.mFull?'<button class="btn ghost" id="mMore" style="margin-top:8px">Load 20 more</button>':''}</div>`;
   $('#mSell').onclick=sellPicker;if($('#mMore'))$('#mMore').onclick=()=>{SOC.mLim+=20;mktSub()};
   document.querySelectorAll('[data-tr]').forEach(e=>e.onclick=()=>{const id=e.dataset.tr,t=SOC.market.find(x=>x.id===id)||SOC.mine.find(x=>x.id===id);if(t)tradeModal(t)})}
-function sellPicker(){const its=S.inv.filter(i=>!i.fav);if(!its.length){toast('No items to sell (favorites are protected)');return}
+function sellPicker(){const its=S.inv.filter(i=>!i.fav&&!i.adv);if(!its.length){toast('No items to sell (favorites are protected)');return}
   modal('Pick an item to sell',its.map(i=>`<div class="slotrow" data-si="${i.uid}"><div><div class="sl">${SLOTN[i.slot]}</div><div class="nm r${i.rarity}">${esc(itemName(i))}</div><div class="meta">ilvl ${i.ilvl} · ${i.mods.length} mods</div></div></div>`).join(''),[{label:'Cancel',cls:'ghost'}]);
   document.querySelectorAll('[data-si]').forEach(e=>e.onclick=()=>{const it=S.inv.find(i=>i.uid===+e.dataset.si);$('#modal').classList.add('hidden');paused=false;priceForm(it)})}
 function priceForm(it){const opt=sel=>PRICEK.map(k=>`<option value="${k}" ${k===sel?'selected':''}>${esc(pname(k))}</option>`).join('');
