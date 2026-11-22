@@ -1210,9 +1210,10 @@ class Sim{
     if(atkE)p.ang=Math.atan2(atkE.y+atkE.h/2-pcy,atkE.x+atkE.w/2-pcx);
     if(atkN)p.ang=Math.atan2(atkN.y+atkN.h/2-pcy,atkN.x+atkN.w/2-pcx);
     p.face=Math.cos(p.ang)>=0?1:-1;
-    let dodge=null;{const dz=s.dangerAt(pcx,pcy);if(dz&&p.dg&&s.t<p.dg.t&&!s.dangerAt(p.dg.x,p.dg.y)){dodge=p.dg;atkE=null;atkN=null}else if(dz){let bs=-1e9;for(const R of [56,84,112]){for(let k=0;k<12;k++){const a=k*Math.PI/6,tx=pcx+Math.cos(a)*R,ty=pcy+Math.sin(a)*R;
+    const keepE=()=>atkE&&!wc.range&&Math.hypot(atkE.x+atkE.w/2-pcx,atkE.y+atkE.h/2-pcy)<=p.w/2+Math.max(atkE.w,atkE.h)/2+wc.reach;
+    let dodge=null;{const dz=s.dangerAt(pcx,pcy);if(dz&&p.dg&&s.t<p.dg.t&&!s.dangerAt(p.dg.x,p.dg.y)){dodge=p.dg;if(!keepE())atkE=null;atkN=null}else if(dz){let bs=-1e9;for(const R of [56,84,112]){for(let k=0;k<12;k++){const a=k*Math.PI/6,tx=pcx+Math.cos(a)*R,ty=pcy+Math.sin(a)*R;
       if(rectSolid(L,tx-9,ty-9,18,18)||s.dangerAt(tx,ty)||!los(L,pcx,pcy,tx,ty,8))continue;let sc=-R+Math.hypot(tx-dz.x,ty-dz.y)*.3;if(goal)sc-=Math.hypot(tx-goal.x,ty-goal.y)*.05;if(sc>bs){bs=sc;dodge={x:tx,y:ty}}}if(dodge)break}
-      if(dodge){atkE=null;atkN=null;p.dg={x:dodge.x,y:dodge.y,t:s.t+1.5}}}}
+      if(dodge){if(!keepE())atkE=null;atkN=null;p.dg={x:dodge.x,y:dodge.y,t:s.t+1.5}}}}
     if((atkE||atkN)&&p.atkCd<=0&&!(p.channel>0)&&!p.dash){
       p.atkCd=Math.max(p.atkCd,-dt)+1/(st.aps*(st.berserk&&s.life<st.life*.5?1.2:1)*(st.bloodlust&&s.t<(s.bloodT||0)?1+.05*(s.blood||0):1));p.swing=p.swingMax=Math.min(wc.swing,p.atkCd*.85);p.alt=!p.alt;if(atkN&&!atkE){p.pick=1;p.pickT=s.t}else if(atkE)p.pick=0;
       if(atkE){const dd=Math.hypot(atkE.x+atkE.w/2-pcx,atkE.y+atkE.h/2-pcy);if(wc.range&&dd>p.w/2+Math.max(atkE.w,atkE.h)/2+wc.reach+4){s.shoot(wc.range&&s.st.wclass==='bow'?'arrow':'bolt',p.ang,null);if(st.surge&&st.wclass==='staff'&&(s.surgeN=(s.surgeN||0)+1)%4===0){s.shoot('bolt',p.ang-.25,null);s.shoot('bolt',p.ang+.25,null)}}else s.hitEnemy(atkE)}
