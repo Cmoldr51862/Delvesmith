@@ -1597,6 +1597,10 @@ function advGearPick(a,slot){const S0=ADV_SLOTS.find(x=>x[0]===slot),used=ADV_SL
   document.querySelectorAll('[data-ag]').forEach(b=>b.onclick=()=>{const v=b.dataset.ag;if(v==='__un'){if(S.inv.length>=S.invCap){toast('Inventory full');return}S.inv.push(a.gear[slot]);delete a.gear[slot]}
     else{const it=S.inv.find(i=>String(i.uid)===v);if(!it)return;if(a.gear[slot]){if(S.inv.length>=S.invCap+1){toast('Inventory full');return}S.inv.push(a.gear[slot])}S.inv=S.inv.filter(i=>i!==it);a.gear[slot]=it}
     $('#modal').classList.add('hidden');paused=false;persist();render()})}
+function advFitHTML(it){if(!S.adv||!S.adv.list.length||!it||it.uq===undefined&&false)return'';const rows=[];
+  for(const a of S.adv.list){const cur=advDepth(a);let best=null;for(const [k,n,fit] of ADV_SLOTS){if(!fit(it))continue;const used=ADV_SLOTS.filter(([k2])=>k2!==k&&a.gear[k2]).map(([k2])=>a.gear[k2].slot);if(used.includes(it.slot)&&!(it.slot==='ring'&&used.filter(x=>x==='ring').length<2))continue;const d=advDepth(a,{...a.gear,[k]:it});if(!best||d>best.d)best={d,n}}
+    if(best)rows.push(`<div class="row"><b>${a.name} <small style="color:#9a90a8">${ROLES[a.role].n}</small></b><span>depth ${cur} → <b style="color:${best.d>cur?'#5dd68c':best.d<cur?'#ff8a7a':'#cfc6dc'}">${best.d}</b> <small class="note">as ${best.n}</small></span></div>`)}
+  return rows.length?`<div class="card" style="margin:10px 0 0"><h3 style="margin:0 0 4px">For adventurers</h3><div class="note" style="margin-bottom:4px">The depth each adventurer could handle with this item in their best slot.</div>${rows.join('')}</div>`:''}
 function fmtDur(ms){const t=Math.ceil(Math.max(0,ms)/60e3),h=Math.floor(t/60),m=t%60;return h?`${h}h ${m}m`:`${m}m`}
 function viewHall(){advTick();const A=S.adv,now=Date.now();let h=hubBar();
   h+=`<div class="card"><h3>Adventurers' Hall</h3><div class="note">Equip adventurers with spare gear and send them on missions. They keep going while the game is closed. Gear can break on missions, so keep crafting replacements.</div></div>`;
@@ -1953,7 +1957,7 @@ function itemModal(it){
   if(USE_FB&&fbUser&&!eq&&!lock)btns.push({label:it.fav?'Sell on market (remove favorite first)':'🏷 Sell on market',cls:'ghost',disabled:!!it.fav,fn:()=>setTimeout(()=>priceForm(it),50)});
   btns.push({label:'Close',cls:'ghost'});
   setTimeout(addModalX,0);
-  modal((it.fav?'★ ':'')+(eq?'Equipped item':'Item'),diff+itemHTML(it)+cmp+(it.fav&&!eq?'<div class="note" style="margin-top:8px;color:#ffd36a">Favorited, so it can\'t be salvaged. Remove the favorite first if you want to scrap it.</div>':'')+(S.idle&&!eq?'<div class="note warn" style="margin-top:8px">Gear swaps are locked during an idle run.</div>':''),btns);
+  modal((it.fav?'★ ':'')+(eq?'Equipped item':'Item'),diff+itemHTML(it)+cmp+(eq?'':advFitHTML(it))+(it.fav&&!eq?'<div class="note" style="margin-top:8px;color:#ffd36a">Favorited, so it can\'t be salvaged. Remove the favorite first if you want to scrap it.</div>':'')+(S.idle&&!eq?'<div class="note warn" style="margin-top:8px">Gear swaps are locked during an idle run.</div>':''),btns);
 }
 
 let lastNew=null;
@@ -1961,7 +1965,7 @@ function viewCraft(){
   const part=S.townTab==='emp'?'emp':'craft';if(part==='emp'&&!(S.flags||{}).empSeen){S.flags.empSeen=1;persist();updTabDots()}
   const items=allItems();let it=findItem(S.sel);if(!it){it=items[0];S.sel=it?it.uid:null}
   let h=hubBar()+`<div class="card"><h3>Item</h3><button class="ipick r${it?it.rarity:0}" id="itemSel">${it?`<span>${isEquipped(it)?'<small>[E] </small>':''}${it.fav?'★ ':''}${itemName(it)} <small>· ilvl ${it.ilvl}</small></span>`:'No items'}<span style="color:var(--dim)">▾</span></button>
-    <div style="margin-top:10px">${it?itemHTML(it,lastNew):''}</div>${it&&idleLocked(it)?'<div class="note warn" style="margin-top:8px">Locked: the runner is wearing this on an idle run.</div>':''}</div>`;
+    <div style="margin-top:10px">${it?itemHTML(it,lastNew)+(S.eq[eqKeyOf(it)]===it?'':advFitHTML(it)):''}</div>${it&&idleLocked(it)?'<div class="note warn" style="margin-top:8px">Locked: the runner is wearing this on an idle run.</div>':''}</div>`;
   if(it&&part==='craft'){
     h+=`<div class="card"><h3>Currency</h3><div class="curgrid">${CKEYS.map(k=>{const c=CUR[k],n=S.cur[k]||0,ok=n>0&&!idleLocked(it)&&(c.omen?true:canUse(k,it));
       const on=c.omen&&S.omen[k];return `<button class="cur ${on?'on':''}" data-cur="${k}" ${ok||on?'':'disabled'}><b>${c.n}<span>${n}</span></b><small>${on?'ACTIVE: tap to cancel':c.d}</small></button>`}).join('')}</div>
