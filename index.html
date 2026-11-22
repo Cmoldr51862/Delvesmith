@@ -1537,11 +1537,23 @@ const HIRE_COST=n=>({copper:400*n,gel:400*n,glowcap:400*n,silk:400*n,starmetal:1
 const BMATS=[['copper','gel'],['glowcap','silk'],['crystal','glowcap'],['ember','crystal'],['voidshard','ember']];
 function advInit(){if(S.adv)return;S.adv={list:[newAdv('warrior',1),newAdv('scout',2)],board:null,seq:3}}
 function newAdv(role,i){const r=Math.random;return{id:'a'+i+'_'+Math.floor(r()*1e6),name:ADV_NAMES[Math.floor(r()*ADV_NAMES.length)],role,lvl:1,xp:0,gear:{},traits:[],hue:Math.floor(r()*360),mis:null,hurtUntil:0}}
-function itemPow(it){if(!it)return 0;return it.ilvl*(1+.1*(it.mods||[]).length+.05*(it.emp||0))*(it.uq?1.25:1)}
 function advTr(a,k){return a.traits.filter(t=>t===k).length}
-function advPow(a){let s=0;for(const [k] of ADV_SLOTS)s+=itemPow(a.gear[k]);return s/4*(1+.04*(a.lvl-1))*(a.role==='warrior'?1.15:a.role==='hunter'?.95:1)*(1+.06*advTr(a,'pow'))}
-function misChance(a,m){const r=advPow(a)/m.d;return Math.max(.05,Math.min(.95,.5+(r-1)*1.6))}
-function misBreak(a,m){const r=advPow(a)/Math.max(1,m.d);return Math.max(.03,Math.min(.5,.08+Math.max(0,1.1-r)*.4))*Math.pow(.75,advTr(a,'brk'))}
+// Adventurers fight like the runner: their 4 items are rated with the same DPS and survival math (no skill tree), against the monsters of the mission depth.
+function advEq(gear){const eq={};for(const [k] of ADV_SLOTS){const it=gear[k];if(!it)continue;let sl=it.slot;if(eq[sl]){if(sl==='ring'&&!eq.ring2)sl='ring2';else continue}eq[sl]=it}return eq}
+function noTree(f){const t=S.tree;S.tree={};try{return f()}finally{S.tree=t}}
+function advQ(eq,d){const p=gearParts(eq,d);return p.dps*p.ehp/(mHP(d)*mDMG(d))}
+const refQC={};
+function refQ(d){d=Math.max(1,Math.round(d));if(refQC[d])return refQC[d];const best=(a,il)=>{const T=AFF[a].t;let i=0;for(let k=0;k<T.length;k++)if(T[k][0]<=il)i=k;return Math.max(0,i-1)};
+  const bb=(slot,cls)=>{let k=null,f=-1;for(const x in BASES){const B=BASES[x];if(B.slot===slot&&(!cls||B.cls===cls)&&B.f<=d&&B.f>f&&!B.el){f=B.f;k=x}}return k},emp=Math.max(0,Math.min(30,Math.round((d-20)/3)));
+  const it=(base,slot,mods)=>({uid:-1,base,slot,ilvl:d,rarity:2,emp,mods:mods.map(a=>{const t=best(a,d),T=AFF[a].t[t];return{a,t,v:(T[1]+T[2])/2}})});
+  const eq={weapon:it(bb('weapon','axe'),'weapon',['addPhys','incPhys','incAps']),body:it(bb('body'),'body',['life','incArmour','fireRes','coldRes']),ring:it('ironring','ring',['life','poisonRes','fireRes']),boots:it(bb('boots'),'boots',['life','coldRes'])};
+  return refQC[d]=noTree(()=>advQ(eq,d))}
+function advMul(a){return (1+.04*(a.lvl-1))*(a.role==='warrior'?1.15:a.role==='hunter'?.95:1)*(1+.06*advTr(a,'pow'))}
+function advRatio(a,d,gear){const eq=advEq(gear||a.gear);if(!eq.weapon&&!Object.keys(eq).length)return 0;return Math.sqrt(noTree(()=>advQ(eq,d))/refQ(d))*advMul(a)}
+function advDepth(a,gear){let lo=1,hi=300;if(advRatio(a,1,gear)<1)return 0;for(let i=0;i<9;i++){const mid=(lo+hi)/2;if(advRatio(a,mid,gear)>=1)lo=mid;else hi=mid}return Math.floor(lo)}
+function advPow(a){return advDepth(a)}
+function misChance(a,m){const r=advRatio(a,m.d);return Math.max(.05,Math.min(.95,.7+(r-1)))}
+function misBreak(a,m){const r=advRatio(a,m.d);return Math.max(.03,Math.min(.5,.08+Math.max(0,1.1-r)*.4))*Math.pow(.75,advTr(a,'brk'))}
 function misHours(a,m){return m.h*(a.role==='scout'?.75:1)*Math.pow(.85,advTr(a,'spd'))}
 function genBoard(){const now=Date.now(),b=Math.max(5,S.best||5),R=Math.random,ms=[];
   for(const [fr,h] of [[.5,1],[.75,2],[1,4],[1.15,8]]){const d=Math.max(3,Math.round(b*fr*(.9+R()*.2))),bi=biomeOf(d),lo=Math.max(1,d-4);
@@ -1575,10 +1587,12 @@ function collectAdv(a){const m=a.mis;if(!m||Date.now()<m.end)return;const R=Math
   if(out.broke)h+=`<div class="note warn" style="margin-top:6px">💥 ${a.name}'s <b style="color:${RCOL[out.broke.rarity]}">${itemName(out.broke)}</b> broke on the mission and is gone.</div>`;
   h+=`<div class="note" style="margin-top:6px">+${out.xp} XP${out.lv.length?` · <b>Level ${out.lv[out.lv.length-1]}!</b>`:''}${out.trait?` · New trait: <b>${out.trait[1]}</b> (${out.trait[2]})`:''}</div>`;
   SFX.play(res==='success'?'escape':'hurt');modal(`${a.name} is back`,h,[{label:'Nice',fn:render}])}
-function advGearPick(a,slot){const S0=ADV_SLOTS.find(x=>x[0]===slot),cands=S.inv.filter(it=>S0[2](it)&&!it.fav).sort((x,y)=>itemPow(y)-itemPow(x)).slice(0,40);
+function advGearPick(a,slot){const S0=ADV_SLOTS.find(x=>x[0]===slot),used=ADV_SLOTS.filter(([k])=>k!==slot&&a.gear[k]).map(([k])=>a.gear[k].slot),ok=it=>!used.includes(it.slot)||(it.slot==='ring'&&used.filter(x=>x==='ring').length<2);
+  const pre=S.inv.filter(it=>S0[2](it)&&!it.fav&&ok(it)).sort((x,y)=>y.ilvl-x.ilvl+((y.emp||0)-(x.emp||0))*3).slice(0,40),cands=pre.map(it=>({it,dep:advDepth(a,{...a.gear,[slot]:it})})).sort((x,y)=>y.dep-x.dep);
   let h=`<div class="note" style="margin-bottom:8px">Gear given to adventurers leaves your inventory and can break on missions. Favorited items can't be used. Empowered items break less often.</div>`;
   if(a.gear[slot])h+=`<button class="btn ghost" data-ag="__un">Take back ${itemName(a.gear[slot])}</button>`;
-  h+=cands.length?cands.map(it=>`<button class="btn ghost" style="display:flex;justify-content:space-between;text-align:left;margin-top:6px" data-ag="${it.uid}"><span style="color:${RCOL[it.rarity]}">${itemName(it)}<br><small style="color:#9a90a8">${BASES[it.base].n} · ilvl ${it.ilvl}</small></span><b>${Math.round(itemPow(it))}</b></button>`).join(''):'<div class="note">No suitable items in your inventory.</div>';
+  const cur=advDepth(a);h+=`<div class="note" style="margin-bottom:6px">${a.name} handles about depth <b>${cur}</b> now. The number on each item is the depth they'd handle with it. Good damage on weapons and Life, Armour and resistances on armour count; filler modifiers don't.</div>`;
+  h+=cands.length?cands.map(({it,dep})=>`<button class="btn ghost" style="display:flex;justify-content:space-between;text-align:left;margin-top:6px" data-ag="${it.uid}"><span style="color:${RCOL[it.rarity]}">${itemName(it)}<br><small style="color:#9a90a8">${BASES[it.base].n} · ilvl ${it.ilvl}</small></span><b style="color:${dep>cur?'#5dd68c':dep<cur?'#ff8a7a':'#cfc6dc'}">${dep}</b></button>`).join(''):'<div class="note">No suitable items in your inventory.</div>';
   modal(`${a.name}: ${S0[1]}`,h,[{label:'Close',cls:'ghost'}]);
   document.querySelectorAll('[data-ag]').forEach(b=>b.onclick=()=>{const v=b.dataset.ag;if(v==='__un'){if(S.inv.length>=S.invCap){toast('Inventory full');return}S.inv.push(a.gear[slot]);delete a.gear[slot]}
     else{const it=S.inv.find(i=>String(i.uid)===v);if(!it)return;if(a.gear[slot]){if(S.inv.length>=S.invCap+1){toast('Inventory full');return}S.inv.push(a.gear[slot])}S.inv=S.inv.filter(i=>i!==it);a.gear[slot]=it}
@@ -1588,7 +1602,7 @@ function viewHall(){advTick();const A=S.adv,now=Date.now();let h=hubBar();
   h+=`<div class="card"><h3>Adventurers' Hall</h3><div class="note">Equip adventurers with spare gear and send them on missions. They keep going while the game is closed. Gear can break on missions, so keep crafting replacements.</div></div>`;
   for(const a of A.list){const busy=!!a.mis,done=busy&&now>=a.mis.end,hurt=!busy&&a.hurtUntil>now,R=ROLES[a.role];
     h+=`<div class="card"><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><div style="width:42px;height:42px;border-radius:50%;background:hsl(${a.hue},45%,38%);display:flex;align-items:center;justify-content:center;font-size:20px">${R.ic}</div>
-      <div style="flex:1"><b style="font-size:16px">${a.name}</b> <span class="note">${R.n} · Lv ${a.lvl} <small>(${a.xp}/${a.lvl*100} XP)</small></span><br><span class="note">Power <b style="color:#ffd36a">${Math.round(advPow(a))}</b>${a.traits.length?' · '+[...new Set(a.traits)].map(t=>{const T=ADV_TRAITS.find(x=>x[0]===t),n=advTr(a,t);return `<span title="${T[2]}">${T[1]}${n>1?' ×'+n:''}</span>`}).join(', '):''}</span></div></div>
+      <div style="flex:1"><b style="font-size:16px">${a.name}</b> <span class="note">${R.n} · Lv ${a.lvl} <small>(${a.xp}/${a.lvl*100} XP)</small></span><br><span class="note">Handles about <b style="color:#ffd36a">depth ${advPow(a)}</b>${a.traits.length?' · '+[...new Set(a.traits)].map(t=>{const T=ADV_TRAITS.find(x=>x[0]===t),n=advTr(a,t);return `<span title="${T[2]}">${T[1]}${n>1?' ×'+n:''}</span>`}).join(', '):''}</span></div></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">${ADV_SLOTS.map(([k,n])=>{const it=a.gear[k];return `<button class="btn ghost small" style="text-align:left;min-height:44px" data-aslot="${a.id}:${k}" ${busy?'disabled':''}><small style="color:#9a90a8">${n}</small><br>${it?`<span style="color:${RCOL[it.rarity]}">${itemName(it)}</span>`:'<span style="color:#6f6680">empty</span>'}</button>`}).join('')}</div>`;
     if(done)h+=`<button class="btn" style="margin-top:8px" data-acol="${a.id}">✓ ${a.mis.name}: collect results</button>`;
     else if(busy)h+=`<div class="note" style="margin-top:8px">On mission: <b>${a.mis.name}</b> · back in <b>${fmtDur(a.mis.end-now)}</b> · ${Math.round(a.mis.chance*100)}% success</div>`;
@@ -2828,7 +2842,7 @@ function fightAnim(a,b,aEnd,bEnd,won,line,done,pvp){modal(pvp?'Arena fight':'Rai
   setTimeout(()=>{const L=$('#fL');if(L)L.innerHTML=`<b style="color:${won?'#5dd68c':'#ff9a7a'}">${line}</b>`;if(btn){btn.disabled=false;btn.textContent='OK';btn.onclick=()=>{$('#modal').classList.add('hidden');paused=false;done&&done()}}},2600)}
 
 updTabDots();
-window.__ds={startLive,setSpd:v=>{speed=v},equipBest,essAff,essFits,CUR,AFF,BASES,SPECS,idleRot,idleSet,localStats,empIntro,abyssMods,salv:salvageMats,Sim,computeStats,genItem,weekMods,mkUnique,mkMap,get S(){return S},get sim(){return sim},rollMod,simIdleRun,get pend(){return idlePending}};setTab(S.tab||'run');resize();initCloud();requestAnimationFrame(frame);
+window.__ds={advDepth,gearParts,mHP,mDMG,startLive,setSpd:v=>{speed=v},equipBest,essAff,essFits,CUR,AFF,BASES,SPECS,idleRot,idleSet,localStats,empIntro,abyssMods,salv:salvageMats,Sim,computeStats,genItem,weekMods,mkUnique,mkMap,get S(){return S},get sim(){return sim},rollMod,simIdleRun,get pend(){return idlePending}};setTab(S.tab||'run');resize();initCloud();requestAnimationFrame(frame);
 })();
 </script>
 </body>
