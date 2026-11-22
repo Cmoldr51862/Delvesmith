@@ -984,7 +984,7 @@ class Sim{
       case 'cleave':{const R=(wc.reach+40)*(M.wide?1.4:1);if(!this.near(R,c.x,c.y).length)return 'No enemies in reach';p.swing=p.swingMax=.3;this.aoe(c.x,c.y,R,1.5,null,'#ffe2b0');break}
       case 'lunge':{t=this.nearest(4*TS,true);if(!t)return 'No target within 4 tiles';const tt=t;p.ang=ang(t);p.dash={tgt:tt,sp:620,t:.45,end:()=>{if(tt.hp>0){this.hitEnemy(tt,2);if(tt.hp<=0&&M.momentum){this.cds.lunge=-.01;this.fx(p.x+9,p.y-30,'Momentum!','#ffd36a')}this.cleanup()}p.swing=p.swingMax=.2}};break}
       case 'guard':this.buff.guard=3;break;
-      case 'whirl':{const dur=M.cyclone?3:2;p.channel=dur;this.buff.whirl=dur;if(M.cyclone)this.buff.haste=Math.max(this.buff.haste||0,dur);for(let i=1;i<=dur*4;i++)this.ev.push({at:this.t+i*.25,f:()=>{const q=this.pc();this.aoe(q.x,q.y,64,.6,null,'#ffe2b0')}});break}
+      case 'whirl':{const dur=M.cyclone?3:2;p.channel=dur;this.buff.whirl=dur;if(M.cyclone)this.buff.haste=Math.max(this.buff.haste||0,dur);{const iv=Math.min(.25,1.5/Math.max(.1,this.st.aps)),nt=Math.round(dur/iv);for(let i=1;i<=nt;i++)this.ev.push({at:this.t+i*iv,f:()=>{const q=this.pc();this.aoe(q.x,q.y,64,.6,null,'#ffe2b0')}})}break}
       case 'rend':{t=this.nearest(this.P.w/2+40+wc.reach,false);if(!t)return 'No enemy in reach';p.ang=ang(t);p.swing=p.swingMax=.3;this.hitEnemy(t,2.5);
         if(M.bleed&&t.hp>0){const tt=t;this.applyDot(tt,'B',3.05);for(let i=1;i<=3;i++)this.ev.push({at:this.t+i,f:()=>{if(tt.hp>0){this.tickK='B';this.hitEnemy(tt,.33);this.tickK=null;this.cleanup()}}})}this.cleanup();break}
       case 'cry':this.buff.cry=6;this.ring(c.x,c.y,90,'#ff6b6b',.5);if(M.rally){this.life=Math.min(this.st.life,this.life+this.st.life*.15);this.pfx(c.x,c.y,'#7ee36b',12,90)}break;
@@ -998,7 +998,7 @@ class Sim{
         else if(el==='poison')this.aoe(nc.x,nc.y,100,1.4,e=>{if(e.poisU>this.t)e.poisS=Math.min(this.st.att==='poison'?8:5,e.poisS+2);if(M.deepfreeze)e.stun=Math.max(e.stun||0,e.boss?.3:1)},'#8fe36b');
         else this.aoe(nc.x,nc.y,100,1.2,e=>{e.slow=3;if(M.deepfreeze)e.stun=Math.max(e.stun||0,e.boss?.3:1)},'#8fd3ff');break}
       case 'heal':{if(this.life>=this.st.life)return 'Already at full Life';this.life=Math.min(this.st.life,this.life+this.st.life*.3);if(M.regrowth)this.buff.regrow=5;this.pfx(c.x,c.y,'#7ee36b',16,120);this.ring(c.x,c.y,40,'#7ee36b',.5);break}
-      case 'flurry':{t=this.nearest(this.P.w/2+30+wc.reach,false);if(!t)return 'No enemy in reach';const tt=t,n=M.thousand?9:6;p.ang=ang(t);p.channel=n*.1;for(let i=0;i<n;i++)this.ev.push({at:this.t+i*.1,f:()=>{if(tt.hp>0){p.swing=p.swingMax=.09;p.alt=!p.alt;this.hitEnemy(tt,.6);this.cleanup()}}});break}
+      case 'flurry':{t=this.nearest(this.P.w/2+30+wc.reach,false);if(!t)return 'No enemy in reach';const tt=t,n=M.thousand?9:6,iv=Math.min(.1,.5/Math.max(.1,this.st.aps));p.ang=ang(t);p.channel=n*iv;for(let i=0;i<n;i++)this.ev.push({at:this.t+i*iv,f:()=>{if(tt.hp>0){p.swing=p.swingMax=Math.min(.09,iv*.9);p.alt=!p.alt;this.hitEnemy(tt,.6);this.cleanup()}}});break}
       case 'shadow':{t=this.nearest(5*TS,false);if(!t)return 'No target within 5 tiles';const a=ang(t),tx=t.x+t.w/2+Math.cos(a)*(t.w/2+14),ty=t.y+t.h/2+Math.sin(a)*(t.h/2+14);
         if(!rectSolid(this.L,tx-9,ty-9,18,18)){this.pfx(c.x,c.y,'#6a5a8a',12,100);p.x=tx-9;p.y=ty-9;p.path=null}p.ang=a+Math.PI;p.swing=p.swingMax=.15;this.hitEnemy(t,2.5,true);this.cleanup();this.pfx(p.x+9,p.y+9,'#6a5a8a',12,100);
         if(M.vanish)this.buff.smoke=Math.max(this.buff.smoke||0,1.5);break}
@@ -1211,9 +1211,9 @@ class Sim{
     if(atkN)p.ang=Math.atan2(atkN.y+atkN.h/2-pcy,atkN.x+atkN.w/2-pcx);
     p.face=Math.cos(p.ang)>=0?1:-1;
     const keepE=()=>atkE&&!wc.range&&Math.hypot(atkE.x+atkE.w/2-pcx,atkE.y+atkE.h/2-pcy)<=p.w/2+Math.max(atkE.w,atkE.h)/2+wc.reach;
-    let dodge=null;{const dz=s.dangerAt(pcx,pcy);if(dz&&p.dg&&s.t<p.dg.t&&!s.dangerAt(p.dg.x,p.dg.y)){dodge=p.dg;if(!keepE())atkE=null;atkN=null}else if(dz){let bs=-1e9;for(const R of [56,84,112]){for(let k=0;k<12;k++){const a=k*Math.PI/6,tx=pcx+Math.cos(a)*R,ty=pcy+Math.sin(a)*R;
+    let dodge=null;{const dz=s.dangerAt(pcx,pcy);if(dz&&p.dg&&s.t<p.dg.t&&!s.dangerAt(p.dg.x,p.dg.y)){dodge=p.dg;if(!keepE())atkE=null}else if(dz){let bs=-1e9;for(const R of [56,84,112]){for(let k=0;k<12;k++){const a=k*Math.PI/6,tx=pcx+Math.cos(a)*R,ty=pcy+Math.sin(a)*R;
       if(rectSolid(L,tx-9,ty-9,18,18)||s.dangerAt(tx,ty)||!los(L,pcx,pcy,tx,ty,8))continue;let sc=-R+Math.hypot(tx-dz.x,ty-dz.y)*.3;if(goal)sc-=Math.hypot(tx-goal.x,ty-goal.y)*.05;if(sc>bs){bs=sc;dodge={x:tx,y:ty}}}if(dodge)break}
-      if(dodge){if(!keepE())atkE=null;atkN=null;p.dg={x:dodge.x,y:dodge.y,t:s.t+1.5}}}}
+      if(dodge){if(!keepE())atkE=null;p.dg={x:dodge.x,y:dodge.y,t:s.t+1.5}}}}
     if((atkE||atkN)&&p.atkCd<=0&&!(p.channel>0)&&!p.dash){
       p.atkCd=Math.max(p.atkCd,-dt)+1/(st.aps*(st.berserk&&s.life<st.life*.5?1.2:1)*(st.bloodlust&&s.t<(s.bloodT||0)?1+.05*(s.blood||0):1));p.swing=p.swingMax=Math.min(wc.swing,p.atkCd*.85);p.alt=!p.alt;if(atkN&&!atkE){p.pick=1;p.pickT=s.t}else if(atkE)p.pick=0;
       if(atkE){const dd=Math.hypot(atkE.x+atkE.w/2-pcx,atkE.y+atkE.h/2-pcy);if(wc.range&&dd>p.w/2+Math.max(atkE.w,atkE.h)/2+wc.reach+4){s.shoot(wc.range&&s.st.wclass==='bow'?'arrow':'bolt',p.ang,null);if(st.surge&&st.wclass==='staff'&&(s.surgeN=(s.surgeN||0)+1)%4===0){s.shoot('bolt',p.ang-.25,null);s.shoot('bolt',p.ang+.25,null)}}else s.hitEnemy(atkE)}
@@ -2741,7 +2741,7 @@ function fightAnim(a,b,aEnd,bEnd,won,line,done,pvp){modal(pvp?'Arena fight':'Rai
   setTimeout(()=>{const L=$('#fL');if(L)L.innerHTML=`<b style="color:${won?'#5dd68c':'#ff9a7a'}">${line}</b>`;if(btn){btn.disabled=false;btn.textContent='OK';btn.onclick=()=>{$('#modal').classList.add('hidden');paused=false;done&&done()}}},2600)}
 
 updTabDots();
-window.__ds={equipBest,essAff,essFits,CUR,AFF,BASES,SPECS,idleRot,idleSet,localStats,empIntro,abyssMods,salv:salvageMats,Sim,computeStats,genItem,weekMods,mkUnique,mkMap,get S(){return S},get sim(){return sim},rollMod,simIdleRun,get pend(){return idlePending}};setTab(S.tab||'run');resize();initCloud();requestAnimationFrame(frame);
+window.__ds={startLive,setSpd:v=>{speed=v},equipBest,essAff,essFits,CUR,AFF,BASES,SPECS,idleRot,idleSet,localStats,empIntro,abyssMods,salv:salvageMats,Sim,computeStats,genItem,weekMods,mkUnique,mkMap,get S(){return S},get sim(){return sim},rollMod,simIdleRun,get pend(){return idlePending}};setTab(S.tab||'run');resize();initCloud();requestAnimationFrame(frame);
 })();
 </script>
 </body>
