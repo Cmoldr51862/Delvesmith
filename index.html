@@ -1539,7 +1539,7 @@ const ADV_SLOTS=[['weapon','Weapon',it=>it.slot==='weapon'],['armour','Armour',i
 const ADV_TRAITS=[['pow','Battle-hardened','+6% power'],['brk','Careful','25% lower gear break chance'],['spd','Swift','Missions take 15% less time'],['mats','Prospector','+20% materials'],['loot','Lucky','+25% gear and currency finds'],['heal','Tough','Recovers from injuries twice as fast']];
 const HIRE_COST=n=>({copper:400*n,gel:400*n,glowcap:400*n,silk:400*n,starmetal:10*n});
 const BMATS=[['copper','gel'],['glowcap','silk'],['crystal','glowcap'],['ember','crystal'],['voidshard','ember']];
-function advInit(){if(S.adv){if(!S.adv.v2){S.adv.v2=1;S.adv.board=null}return}S.adv={list:[newAdv('warrior',1),newAdv('scout',2)],board:null,seq:3,v2:1}}
+function advInit(){if(S.adv){if(!S.adv.v2){S.adv.v2=1;S.adv.board=null}if(!S.adv.v3){S.adv.v3=1;S.adv.board=null}return}S.adv={list:[newAdv('warrior',1),newAdv('scout',2)],board:null,seq:3,v2:1,v3:1}}
 function newAdv(role,i){const r=Math.random;return{id:'a'+i+'_'+Math.floor(r()*1e6),name:ADV_NAMES[Math.floor(r()*ADV_NAMES.length)],role,lvl:1,xp:0,gear:{},traits:[],hue:Math.floor(r()*360),mis:null,hurtUntil:0}}
 function advTr(a,k){return a.traits.filter(t=>t===k).length}
 // Adventurers fight like the runner: their 4 items are rated with the same DPS and survival math (no skill tree), against the monsters of the mission depth.
@@ -1558,41 +1558,60 @@ const QSTAR=3;
 function advRatio(a,d,gear){const eq=advEq(gear||a.gear);if(!Object.keys(eq).length)return 0;return Math.sqrt(noTree(()=>advQ(eq,d))/QSTAR)*advMul(a)}
 function advDepth(a,gear){let lo=1,hi=300;if(advRatio(a,1,gear)<1)return 0;for(let i=0;i<9;i++){const mid=(lo+hi)/2;if(advRatio(a,mid,gear)>=1)lo=mid;else hi=mid}return Math.floor(lo)}
 function advPow(a){return advDepth(a)}
-function misChance(a,m){const r=advRatio(a,m.d);return Math.max(.05,Math.min(.95,.7+(r-1)))}
-function misBreak(a,m){const r=advRatio(a,m.d);return Math.max(.03,Math.min(.5,.08+Math.max(0,1.1-r)*.4))*Math.pow(.75,advTr(a,'brk'))}
-function misHours(a,m){return m.h*(a.role==='scout'?.75:1)*Math.pow(.85,advTr(a,'spd'))}
+const PARTY_W=.4,PARTY_REW=.5,PARTY_MAX=3;
+function asParty(a){return Array.isArray(a)?a:[a]}
+function partyR(a,d){const rs=asParty(a).map(x=>advRatio(x,d)).sort((x,y)=>y-x);return rs.length?rs[0]+PARTY_W*rs.slice(1).reduce((s,v)=>s+v,0):0}
+function misChance(a,m){const r=partyR(a,m.d);return Math.max(.05,Math.min(.95,.7+(r-1)))}
+function misBreak(a,m){const r=partyR(a,m.d),one=x=>Math.max(.03,Math.min(.5,.08+Math.max(0,1.1-r)*.4))*Math.pow(.75,advTr(x,'brk'));return Array.isArray(a)?Math.max(...a.map(one)):one(a)}
+function misHours(a,m){return Math.max(...asParty(a).map(x=>m.h*(x.role==='scout'?.75:1)*Math.pow(.85,advTr(x,'spd'))))}
 function genBoard(){const now=Date.now(),top=Math.max(0,...S.adv.list.map(a=>advDepth(a))),b=Math.max(8,top||Math.round((S.best||5)*.4)),R=Math.random,ms=[];
-  for(const [fr,h] of [[.6,1],[.85,2],[1,4],[1.2,8]]){const d=Math.max(3,Math.round(b*fr*(.9+R()*.2))),bi=biomeOf(d),lo=Math.max(1,d-4);
-    ms.push({id:'m'+Math.floor(R()*1e9),d,h,bi,name:`${['Clear','Scout','Raid','Delve into'][Math.floor(R()*4)]} the ${BIOMES[bi].name.replace(/^The /,'')}`,lo,hi:d+5})}
+  const mk=(fr,h,pm)=>{const d=Math.max(3,Math.round(b*fr*(.9+R()*.2))),bi=biomeOf(d),lo=Math.max(1,d-4);
+    return{id:'m'+Math.floor(R()*1e9),d,h,bi,pm:pm?1:0,name:`${pm?['Siege','Conquer','Purge'][Math.floor(R()*3)]:['Clear','Scout','Raid','Delve into'][Math.floor(R()*4)]} the ${BIOMES[bi].name.replace(/^The /,'')}`,lo,hi:d+5}};
+  for(const [fr,h] of [[.6,1],[.85,2],[1,4],[1.2,8]])ms.push(mk(fr,h,0));
+  if(S.adv.list.length>=2)for(const [fr,h] of [[1.2,4],[1.4,8]])ms.push(mk(fr,h,1));
   S.adv.board={at:now,ms}}
 function advTick(){advInit();const b=S.adv.board;if(!b||Date.now()-b.at>4*3600e3||!b.ms.length)genBoard()}
 function advReady(){return S.adv&&S.adv.list.some(a=>a.mis&&Date.now()>=a.mis.end)}
-function sendAdv(a,m){const c=misChance(a,m),brk=misBreak(a,m),hrs=misHours(a,m),now=Date.now();
-  a.mis={...m,start:now,end:now+hrs*3600e3,chance:c,brk};S.adv.board.ms=S.adv.board.ms.filter(x=>x.id!==m.id);persist();render()}
-function collectAdv(a){const m=a.mis;if(!m||Date.now()<m.end)return;const R=Math.random,roll=R(),out={mats:{},cur:{},items:[],maps:[],broke:null,res:''};
-  const res=roll<m.chance?'success':roll<m.chance+(1-m.chance)*.5?'partial':'fail',mult=res==='success'?1:res==='partial'?.4:0,hrs=m.h,loot=(a.role==='hunter'?1.4:1)*(1+.25*advTr(a,'loot'));out.res=res;
-  if(mult>0){const mm=(a.role==='scout'?1.25:1)*(1+.2*advTr(a,'mats'));const tot=Math.round((20+m.d*1.5)*hrs*mult*mm);const [m1,m2]=BMATS[m.bi];out.mats[m1]=Math.round(tot*.6);out.mats[m2]=tot-out.mats[m1];
-    if(R()<Math.min(1,hrs*.25*mult))out.mats.starmetal=1+Math.floor(R()*hrs*.5);
+function sendAdv(a,m){const ps=asParty(a),c=misChance(ps,m),brk=misBreak(ps,m),hrs=misHours(ps,m),now=Date.now(),pid='p'+Math.floor(Math.random()*1e9),ids=ps.map(x=>x.id);
+  for(const x of ps)x.mis={...m,start:now,end:now+hrs*3600e3,chance:c,brk,party:ids,pid};S.adv.board.ms=S.adv.board.ms.filter(x=>x.id!==m.id);persist();render()}
+function misMembers(a){const m=a.mis;if(!m||!m.party)return[a];return S.adv.list.filter(x=>x.mis&&x.mis.pid===m.pid)}
+function collectAdv(a){const m=a.mis;if(!m||Date.now()<m.end)return;const ps=misMembers(a),n=ps.length,R=Math.random,roll=R(),out={mats:{},cur:{},items:[],maps:[],broke:[],res:''};
+  const res=roll<m.chance?'success':roll<m.chance+(1-m.chance)*.5?'partial':'fail',mult=res==='success'?1:res==='partial'?.4:0,hrs=m.h,rew=(1+PARTY_REW*(n-1))*(m.pm?1.5:1);out.res=res;
+  const loot=Math.max(...ps.map(x=>(x.role==='hunter'?1.4:1)*(1+.25*advTr(x,'loot'))))*rew,mm=Math.max(...ps.map(x=>(x.role==='scout'?1.25:1)*(1+.2*advTr(x,'mats'))))*rew;
+  if(mult>0){const tot=Math.round((20+m.d*1.5)*hrs*mult*mm);const [m1,m2]=BMATS[m.bi];out.mats[m1]=Math.round(tot*.6);out.mats[m2]=tot-out.mats[m1];
+    if(R()<Math.min(1,hrs*.25*mult*rew))out.mats.starmetal=1+Math.floor(R()*hrs*.5*rew);
     const pool=['chaos','chaos','void','crown','graft','scour','tinker','ascend','divine'];const nc=Math.round(hrs*1.5*mult*loot);for(let i=0;i<nc;i++){const k=pool[Math.floor(R()*pool.length)];out.cur[k]=(out.cur[k]||0)+1}
     const ni=Math.floor(hrs*.6*mult*loot+R());for(let i=0;i<ni;i++)out.items.push(genItem(R,Math.max(1,m.d),1.5));
     if(R()<hrs*.08*mult*loot)out.maps.push(mkMap(R,Math.max(5,m.d+Math.floor(R()*6)),1));
     if(R()<hrs*.025*mult*loot)out.items.push(mkUnique(UQK[Math.floor(R()*UQK.length)],R,m.d))}
-  const eqd=ADV_SLOTS.map(([k])=>k).filter(k=>a.gear[k]);if(eqd.length&&R()<m.brk){const k=eqd[Math.floor(R()*eqd.length)],it=a.gear[k];if(R()<1/(1+.1*(it.emp||0))){out.broke=it;delete a.gear[k]}}
-  const xp=Math.round(hrs*25*(res==='success'?1:res==='partial'?.6:.3));a.xp+=xp;out.xp=xp;out.lv=[];while(a.xp>=a.lvl*100){a.xp-=a.lvl*100;a.lvl++;out.lv.push(a.lvl);if(a.lvl%3===0){const t=ADV_TRAITS[Math.floor(R()*ADV_TRAITS.length)];a.traits.push(t[0]);out.trait=t}}
-  if(res!=='success')a.hurtUntil=Date.now()+(res==='partial'?1:2+hrs)*3600e3/(1+advTr(a,'heal'));
+  const xpT=Math.round(hrs*25*(res==='success'?1:res==='partial'?.6:.3)*rew),xp=Math.round(xpT/n);out.xp=xp;out.lv={};out.trait={};
+  for(const a of ps){const brk=Math.max(.03,Math.min(.5,m.brk))*(m.party&&n>1?Math.pow(.75,advTr(a,'brk'))/Math.max(...ps.map(x=>Math.pow(.75,advTr(x,'brk')))):1);
+    const eqd=ADV_SLOTS.map(([k])=>k).filter(k=>a.gear[k]);if(eqd.length&&R()<brk){const k=eqd[Math.floor(R()*eqd.length)],it=a.gear[k];if(R()<1/(1+.1*(it.emp||0))){out.broke.push([a,it]);delete a.gear[k]}}
+    a.xp+=xp;const lv=[];while(a.xp>=a.lvl*100){a.xp-=a.lvl*100;a.lvl++;lv.push(a.lvl);if(a.lvl%3===0){const t=ADV_TRAITS[Math.floor(R()*ADV_TRAITS.length)];a.traits.push(t[0]);out.trait[a.id]=t}}out.lv[a.id]=lv;
+    if(res!=='success')a.hurtUntil=Date.now()+(res==='partial'?1:2+hrs)*3600e3/(1+advTr(a,'heal'));a.mis=null}
   for(const k in out.mats)S.mats[k]=(S.mats[k]||0)+out.mats[k];for(const k in out.cur)S.cur[k]=(S.cur[k]||0)+out.cur[k];
   let sal=0;for(const it of out.items){if(S.inv.length<S.invCap)S.inv.push(it);else{sal++;const sm=salvageMats(it);for(const k in sm)S.mats[k]=(S.mats[k]||0)+sm[k]}}
   for(const mp of out.maps)if(S.maps.length<30)S.maps.push(mp);
-  a.mis=null;persist();
-  const nm=k=>(MATS[k]||{}).n||k,ch=(k,n,c)=>`<span class="chip" style="color:${c||'#e2dccf'}">${n} ${k}</span>`;
-  let h=`<div class="note" style="margin-bottom:8px">${m.name} (depth ${m.lo}–${m.hi}, ${m.h}h)</div>`;
+  persist();
+  const nm=k=>(MATS[k]||{}).n||k,ch=(k,n,c)=>`<span class="chip" style="color:${c||'#e2dccf'}">${n} ${k}</span>`,names=ps.map(x=>x.name).join(', ');
+  let h=`<div class="note" style="margin-bottom:8px">${m.name} (depth ${m.lo}–${m.hi}, ${m.h}h)${n>1?` · party: ${names}`:''}</div>`;
   h+=`<div style="font-size:20px;font-weight:800;margin-bottom:8px;color:${res==='success'?'#5dd68c':res==='partial'?'#ffd36a':'#ff8a7a'}">${res==='success'?'Success!':res==='partial'?'Partial success: came back hurt':'Failed: came back empty-handed and hurt'}</div>`;
   const parts=[...Object.entries(out.mats).map(([k,n])=>ch(nm(k),n,(MATS[k]||{}).c)),...Object.entries(out.cur).map(([k,n])=>ch(CUR[k].n,n,'#ffd36a')),...out.items.map(it=>ch(itemName(it),'',RCOL[it.rarity])),...out.maps.map(mp=>ch(`Delve Map (Floor ${mp.floor})`,'','#c08aff'))];
   if(parts.length)h+=`<div class="chips" style="flex-wrap:wrap;gap:6px;margin-bottom:8px">${parts.join('')}</div>`;
   if(sal)h+=`<div class="note">Inventory full: ${sal} item${sal>1?'s were':' was'} salvaged into materials.</div>`;
-  if(out.broke)h+=`<div class="note warn" style="margin-top:6px">💥 ${a.name}'s <b style="color:${RCOL[out.broke.rarity]}">${itemName(out.broke)}</b> broke on the mission and is gone.</div>`;
-  h+=`<div class="note" style="margin-top:6px">+${out.xp} XP${out.lv.length?` · <b>Level ${out.lv[out.lv.length-1]}!</b>`:''}${out.trait?` · New trait: <b>${out.trait[1]}</b> (${out.trait[2]})`:''}</div>`;
-  SFX.play(res==='success'?'escape':'hurt');modal(`${a.name} is back`,h,[{label:'Nice',fn:render}])}
+  for(const [a,it] of out.broke)h+=`<div class="note warn" style="margin-top:6px">💥 ${a.name}'s <b style="color:${RCOL[it.rarity]}">${itemName(it)}</b> broke on the mission and is gone.</div>`;
+  h+=ps.map(a=>{const lv=out.lv[a.id]||[],t=out.trait[a.id];return `<div class="note" style="margin-top:6px">${n>1?`<b>${a.name}</b>: `:''}+${xp} XP${lv.length?` · <b>Level ${lv[lv.length-1]}!</b>`:''}${t?` · New trait: <b>${t[1]}</b> (${t[2]})`:''}</div>`}).join('');
+  if(n>1)h+=`<div class="note" style="margin-top:4px">Party XP is split evenly.</div>`;
+  SFX.play(res==='success'?'escape':'hurt');modal(n>1?'Party is back':`${a.name} is back`,h,[{label:'Nice',fn:render}])}
+let partySel=[];
+function partyPick(m){const now=Date.now(),free=S.adv.list.filter(a=>!a.mis&&!(a.hurtUntil>now)&&ADV_SLOTS.some(([k])=>a.gear[k])),min=m.pm?2:1;partySel=partySel.filter(id=>free.some(a=>a.id===id));
+  const draw=()=>{const ps=free.filter(a=>partySel.includes(a.id));let h=`<div class="note" style="margin-bottom:8px">Depth ${m.lo}–${m.hi} · difficulty ${m.d} · ${m.h}h${m.pm?' · <b style="color:#c08aff">Party mission: 2–3 adventurers, bigger rewards</b>':''}<br>Pick up to ${PARTY_MAX}. The strongest member leads and each extra member adds 40% of their strength. Each extra member also adds +50% rewards, but XP is split evenly.</div>`;
+    h+=free.map(a=>{const on=partySel.includes(a.id),r=advRatio(a,m.d);return `<button class="btn ${on?'':'ghost'}" style="margin-top:6px;text-align:left;display:flex;justify-content:space-between" data-pp="${a.id}"><span>${on?'✓ ':''}${a.name} <small style="color:${on?'inherit':'#9a90a8'}">${ROLES[a.role].n} · depth ${advDepth(a)}</small></span><small>${Math.round(Math.max(.05,Math.min(.95,.7+(r-1)))*100)}% solo</small></button>`}).join('')||'<div class="note">No adventurer is ready.</div>';
+    if(ps.length)h+=`<div class="card" style="margin:10px 0 0"><div class="row"><b>Success</b><span>${Math.round(misChance(ps,m)*100)}%</span></div><div class="row"><b>Break chance (each)</b><span>${Math.round(misBreak(ps,m)*100)}%</span></div><div class="row"><b>Time</b><span>${fmtDur(misHours(ps,m)*3600e3)}</span></div><div class="row"><b>Rewards</b><span>×${((1+PARTY_REW*(ps.length-1))*(m.pm?1.5:1)).toFixed(1)}</span></div></div>`;
+    const ok=ps.length>=min;$('#mBody').innerHTML=h;
+    document.querySelectorAll('[data-pp]').forEach(b=>b.onclick=()=>{const id=b.dataset.pp;if(partySel.includes(id))partySel=partySel.filter(x=>x!==id);else if(partySel.length<PARTY_MAX)partySel.push(id);else{toast(`Max ${PARTY_MAX} per mission`);return}draw()});
+    const sb=document.querySelector('#mBtns .btn');if(sb){sb.disabled=!ok;sb.textContent=ok?`Send ${ps.length>1?'party':ps[0].name}`:m.pm?'Pick at least 2':'Pick an adventurer'}};
+  modal(m.name,'',[{label:'Send',fn:()=>{const ps=free.filter(a=>partySel.includes(a.id));if(ps.length<min){toast(m.pm?'Party missions need at least 2':'Pick an adventurer');setTimeout(()=>partyPick(m),0);return}partySel=[];sendAdv(ps,m)}},{label:'Cancel',cls:'ghost'}]);draw()}
 function advBestKit(a){const g={...a.gear},sc=gear=>{const d=advDepth(a,gear);return d+Math.min(.99,advRatio(a,Math.max(1,d),gear)-1)*.5};
   const pool=S.inv.filter(it=>!it.fav&&it.slot!=='flask'),by={};for(const [k,,fit] of ADV_SLOTS)by[k]=pool.filter(fit).sort((x,y)=>(y.adv?1:0)-(x.adv?1:0)||y.ilvl-x.ilvl+((y.emp||0)-(x.emp||0))*3).slice(0,25);
   let cur=sc(g);for(let pass=0;pass<3;pass++){let moved=false;for(const [k] of ADV_SLOTS){const inUse=new Set(Object.entries(g).filter(([k2,v])=>k2!==k&&v).map(([,v])=>v.uid));
@@ -1641,14 +1660,14 @@ function viewHall(){advTick();const A=S.adv,now=Date.now();let h=hubBar();
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">${ADV_SLOTS.map(([k,n])=>{const it=a.gear[k];return `<button class="btn ghost small" style="text-align:left;min-height:44px" data-aslot="${a.id}:${k}" ${busy?'disabled':''}><small style="color:#9a90a8">${n}</small><br>${it?`<span style="color:${RCOL[it.rarity]}">${itemName(it)}</span>`:'<span style="color:#6f6680">empty</span>'}</button>`}).join('')}</div>`;
     if(!busy)h+=`<button class="btn ghost small" style="margin-top:6px" data-abest="${a.id}">✨ Give best gear</button>`;
     if(done)h+=`<button class="btn" style="margin-top:8px" data-acol="${a.id}">✓ ${a.mis.name}: collect results</button>`;
-    else if(busy)h+=`<div class="note" style="margin-top:8px">On mission: <b>${a.mis.name}</b> · back in <b>${fmtDur(a.mis.end-now)}</b> · ${Math.round(a.mis.chance*100)}% success</div>`;
+    else if(busy)h+=`<div class="note" style="margin-top:8px">On mission: <b>${a.mis.name}</b>${a.mis.party&&a.mis.party.length>1?` with ${A.list.filter(x=>x!==a&&x.mis&&x.mis.pid===a.mis.pid).map(x=>x.name).join(' & ')}`:''} · back in <b>${fmtDur(a.mis.end-now)}</b> · ${Math.round(a.mis.chance*100)}% success</div>`;
     else if(hurt)h+=`<div class="note warn" style="margin-top:8px">Injured: recovering for ${fmtDur(a.hurtUntil-now)}</div>`;
     else h+=`<div class="note" style="margin-top:8px">Ready. Pick a mission below.</div>`;
     h+=`</div>`}
   const free=A.list.filter(a=>!a.mis&&!(a.hurtUntil>now)&&ADV_SLOTS.some(([k])=>a.gear[k]));
   h+=`<div class="card"><h3>Mission board</h3><div class="note" style="margin-bottom:8px">New missions every 4 hours · refreshes in ${fmtDur(A.board.at+4*3600e3-now)}</div>`;
-  h+=A.board.ms.length?A.board.ms.map(m=>`<div class="recipe"><div class="rhead"><span class="rname">${m.name}</span><span class="rhave">${m.h}h</span></div><div class="note">Depth ${m.lo}–${m.hi} · difficulty ${m.d}</div>
-    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${A.list.map(a=>{const ok=free.includes(a);if(!ok)return'';const c=misChance(a,m),b=misBreak(a,m);return `<button class="btn small ${c>=.6?'':'ghost'}" data-asend="${a.id}:${m.id}" style="width:auto;flex:1">Send ${a.name}<br><small>${Math.round(c*100)}% success · ${Math.round(b*100)}% break · ${fmtDur(misHours(a,m)*3600e3)}</small></button>`}).join('')||'<span class="note">No adventurer ready (they need at least one piece of gear and can\'t be injured or away).</span>'}</div></div>`).join(''):'<div class="note">All missions taken. New ones soon.</div>';
+  h+=A.board.ms.length?A.board.ms.map(m=>`<div class="recipe" ${m.pm?'style="border-color:#c08aff55"':''}><div class="rhead"><span class="rname">${m.pm?'<span style="color:#c08aff">⚔⚔ </span>':''}${m.name}</span><span class="rhave">${m.h}h</span></div><div class="note">Depth ${m.lo}–${m.hi} · difficulty ${m.d}${m.pm?' · <b style="color:#c08aff">Party: 2–3 adventurers, ×1.5 rewards</b>':''}</div>
+    ${free.length>=(m.pm?2:1)?`<button class="btn small" style="margin-top:6px" data-amis="${m.id}">Choose adventurers${(()=>{const b=free.map(a=>misChance(a,m)).sort((x,y)=>y-x)[0];return m.pm?'':` <small>(best solo ${Math.round(b*100)}%)</small>`})()}</button>`:`<div class="note" style="margin-top:6px">${m.pm?'Needs at least 2 ready adventurers.':'No adventurer ready (they need at least one piece of gear and can\'t be injured or away).'}</div>`}</div>`).join(''):'<div class="note">All missions taken. New ones soon.</div>';
   h+=`</div>`;
   if(A.list.length<5){const n=A.list.length-1,c=HIRE_COST(n),can=Object.entries(c).every(([k,v])=>(S.mats[k]||0)>=v);
     h+=`<div class="card"><h3>Hire an adventurer (${A.list.length}/5)</h3><div class="chips" style="flex-wrap:wrap;gap:6px;margin-bottom:8px">${Object.entries(c).map(([k,v])=>`<span class="chip" style="color:${(S.mats[k]||0)>=v?MATS[k].c:'#ff8a7a'}">${v} ${MATS[k].n}</span>`).join('')}</div>
@@ -1657,7 +1676,7 @@ function viewHall(){advTick();const A=S.adv,now=Date.now();let h=hubBar();
   document.querySelectorAll('[data-aslot]').forEach(b=>b.onclick=()=>{const[id,k]=b.dataset.aslot.split(':');advGearPick(A.list.find(a=>a.id===id),k)});
   document.querySelectorAll('[data-abest]').forEach(b=>b.onclick=()=>advGiveBest(A.list.find(a=>a.id===b.dataset.abest)));
   document.querySelectorAll('[data-acol]').forEach(b=>b.onclick=()=>collectAdv(A.list.find(a=>a.id===b.dataset.acol)));
-  document.querySelectorAll('[data-asend]').forEach(b=>b.onclick=()=>{const[id,mid]=b.dataset.asend.split(':');sendAdv(A.list.find(a=>a.id===id),A.board.ms.find(m=>m.id===mid))});
+  document.querySelectorAll('[data-amis]').forEach(b=>b.onclick=()=>{partySel=[];partyPick(A.board.ms.find(m=>m.id===b.dataset.amis))});
   document.querySelectorAll('[data-ahire]').forEach(b=>b.onclick=()=>{const c=HIRE_COST(A.list.length-1);for(const k in c)S.mats[k]-=c[k];A.list.push(newAdv(b.dataset.ahire,A.seq++));persist();render();toast('New adventurer hired!')});
   clearTimeout(viewHall.t);if(A.list.some(a=>a.mis||a.hurtUntil>now))viewHall.t=setTimeout(()=>{if(S.tab==='refine'&&S.townTab==='hall'&&$('#modal').classList.contains('hidden'))viewHall()},30000)}
 
