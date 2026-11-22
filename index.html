@@ -329,10 +329,10 @@ const bname=f=>BIOMES[biomeOf(f)].name+cycName(f);
 // ================= SOUND =================
 const SFX=(()=>{let ac=null,master=null,nb=null;const last={},q=[];
   const on=()=>S&&S.set&&S.set.sound!==false,vol=()=>S&&S.set&&S.set.vol!=null?S.set.vol:.6;
-  function ctx(){if(!ac){const A=window.AudioContext||window.webkitAudioContext;if(!A)return null;ac=new A();master=ac.createGain();master.connect(ac.destination);
+  function ctx(make){if(!ac){if(!make)return null;const A=window.AudioContext||window.webkitAudioContext;if(!A)return null;ac=new A();master=ac.createGain();master.connect(ac.destination);
     nb=ac.createBuffer(1,ac.sampleRate*.6,ac.sampleRate);const d=nb.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1}
     if(ac.state!=='running')try{ac.resume().catch(()=>{})}catch(e){}return ac}
-  function revive(){if(!ac||!on())return;if(ac.state==='running')return;try{ac.resume().catch(()=>{})}catch(e){}setTimeout(()=>{if(ac&&ac.state!=='running'){try{ac.close()}catch(e){}ac=null;master=null;nb=null;for(const k in last)delete last[k]}},250)}
+  function revive(){if(!ac||!on()||ac.state==='running')return;try{ac.resume().catch(()=>{})}catch(e){}}
   function env(g,t,a,v,dur){g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(v,t+a);g.gain.exponentialRampToValueAtTime(0.0001,t+dur)}
   function tone(f,dur,type,v,f2,delay){const t=ac.currentTime+(delay||0),o=ac.createOscillator(),g=ac.createGain();o.type=type||'square';o.frequency.setValueAtTime(f,t);if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+dur);env(g,t,.005,v,dur);o.connect(g);g.connect(master);o.start(t);o.stop(t+dur+.02)}
   function noise(dur,ft,ff,v,ff2,delay){const t=ac.currentTime+(delay||0),src=ac.createBufferSource(),f=ac.createBiquadFilter(),g=ac.createGain();src.buffer=nb;f.type=ft;f.frequency.setValueAtTime(ff,t);if(ff2)f.frequency.exponentialRampToValueAtTime(ff2,t+dur);env(g,t,.004,v,dur);src.connect(f);f.connect(g);g.connect(master);src.start(t);src.stop(t+dur+.02)}
@@ -363,7 +363,7 @@ const SFX=(()=>{let ac=null,master=null,nb=null;const last={},q=[];
   const GAP={hit:.06,crit:.08,swing:.08,arrow:.07,bolt:.07,kill:.07,hurt:.12,mine:.08,pickup:.08,boom:.1,trap:.15,fire:.1,frost:.1,toxic:.1};
   return{play(n){if(!on()||!P[n])return;const c=ctx();if(!c)return;const t=c.currentTime;if(last[n]!=null&&t-last[n]<(GAP[n]||.03))return;last[n]=t;master.gain.value=vol();try{P[n]()}catch(e){}},
     stale:false,
-    unlock(){if(!on())return;if(ac&&(this.stale||ac.state!=='running')){try{ac.close()}catch(e){}ac=null;for(const k in last)delete last[k]}this.stale=false;const c=ctx();if(!c)return;try{const b=c.createBuffer(1,1,22050),src=c.createBufferSource();src.buffer=b;src.connect(c.destination);src.start(0)}catch(e){}},revive,q,flush(){let k=0;while(q.length&&k++<6)this.play(q.shift());q.length=0}}})();
+    unlock(){if(!on())return;if(ac&&this.stale){try{ac.close()}catch(e){}ac=null;master=null;nb=null;for(const k in last)delete last[k]}this.stale=false;let c;try{c=ctx(true)}catch(e){ac=null;return}if(!c)return;try{const b=c.createBuffer(1,1,22050),src=c.createBufferSource();src.buffer=b;src.connect(c.destination);src.start(0)}catch(e){}},revive,q,flush(){let k=0;while(q.length&&k++<6)this.play(q.shift());q.length=0}}})();
 setInterval(()=>{try{updTabDots()}catch(e){}},60000);
 for(const ev of ['touchend','click','keydown'])document.addEventListener(ev,()=>SFX.unlock(),{passive:true,capture:true});
 document.addEventListener('visibilitychange',()=>{if(document.hidden)SFX.stale=true;else SFX.revive()});window.addEventListener('pagehide',()=>{SFX.stale=true});window.addEventListener('pageshow',()=>SFX.revive());
