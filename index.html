@@ -364,6 +364,7 @@ const SFX=(()=>{let ac=null,master=null,nb=null;const last={},q=[];
   return{play(n){if(!on()||!P[n])return;const c=ctx();if(!c)return;const t=c.currentTime;if(last[n]!=null&&t-last[n]<(GAP[n]||.03))return;last[n]=t;master.gain.value=vol();try{P[n]()}catch(e){}},
     stale:false,
     unlock(){if(!on())return;if(ac&&(this.stale||ac.state!=='running')){try{ac.close()}catch(e){}ac=null;for(const k in last)delete last[k]}this.stale=false;const c=ctx();if(!c)return;try{const b=c.createBuffer(1,1,22050),src=c.createBufferSource();src.buffer=b;src.connect(c.destination);src.start(0)}catch(e){}},revive,q,flush(){let k=0;while(q.length&&k++<6)this.play(q.shift());q.length=0}}})();
+setInterval(()=>{try{updTabDots()}catch(e){}},60000);
 for(const ev of ['touchend','click','keydown'])document.addEventListener(ev,()=>SFX.unlock(),{passive:true,capture:true});
 document.addEventListener('visibilitychange',()=>{if(document.hidden)SFX.stale=true;else SFX.revive()});window.addEventListener('pagehide',()=>{SFX.stale=true});window.addEventListener('pageshow',()=>SFX.revive());
 const DOTC={B:'#ff5a5a',P:'#8fe36b',F:'#ffa040',C:'#9fdcff'};
@@ -1448,7 +1449,7 @@ function empRefund(it){const o={};for(let n=0;n<(it.emp||0);n++){const c=empCost
 
 // ================= TOWN VIEWS =================
 function setTab(t){if(t==='craft'){t='refine';S.townTab='craft'}S.tab=t;persist();document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));updTabDots();render();$('#town').scrollTop=0}
-function updTabDots(){const b=document.querySelector('#tabs [data-tab=refine]');if(b)b.innerHTML='Town'+(!(S.flags||{}).empSeen&&(S.best||0)>=2?'<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#ff9a3a;margin-left:4px;vertical-align:top"></span>':'')}
+function updTabDots(){const b=document.querySelector('#tabs [data-tab=refine]');if(b)b.innerHTML='Town'+((!(S.flags||{}).empSeen&&(S.best||0)>=2)||advReady()?'<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#ff9a3a;margin-left:4px;vertical-align:top"></span>':'')}
 function goEmpower(uid){S.sel=uid;S.townTab='emp';setTab('refine');setTimeout(()=>{const c=document.getElementById('empCard');if(c){c.scrollIntoView({block:'center'});c.style.boxShadow='0 0 0 2px #ff9a3a';setTimeout(()=>c.style.boxShadow='',1800)}},60)}
 function empIntro(tries){tries=tries||0;clearTimeout(empIntro.t);if((S.flags||{}).empIntro||(S.best||0)<2||!S.eq.weapon)return;
   if(mode!=='town'||!$('#modal').classList.contains('hidden')){if(tries<120)empIntro.t=setTimeout(()=>empIntro(tries+1),1300);return}
@@ -1524,10 +1525,92 @@ function nodeModal(n){
   if(S.idle)b+=`<div class="note warn" style="margin-top:6px">The tree is locked while an expedition is running.</div>`;
   modal(n.n,b,[{label:rk>=n.max?'Maxed':'Spend a point',disabled:!can,fn:()=>{S.tree[n.id]=rk+1;persist();viewTree();toast(`${n.n} ${n.max>1?`rank ${rk+1}`:'unlocked'}!`)}},{label:'Close',cls:'ghost'}]);
 }
-const TT=[['craft','Crafting'],['emp','Empowering'],['refine','Refining'],['build','Upgrades']];
-function hubBar(){const t=S.townTab||'craft',dot=!(S.flags||{}).empSeen&&(S.best||0)>=2;return `<h1>TOWN</h1><div class="chips" style="margin:0 0 12px;gap:6px;flex-wrap:wrap">${TT.map(([k,n])=>`<button class="btn small ${t===k?'':'ghost'}" data-tt="${k}" style="width:auto;flex:1;min-width:0;padding:8px 2px;font-size:12px;white-space:nowrap">${n}${k==='emp'&&dot?'<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#ff9a3a;margin-left:4px;vertical-align:top"></span>':''}</button>`).join('')}</div>`}
+const TT=[['craft','Crafting'],['emp','Empowering'],['refine','Refining'],['build','Upgrades'],['hall','Hall']];
+function hubBar(){const t=S.townTab||'craft',dot=!(S.flags||{}).empSeen&&(S.best||0)>=2;return `<h1>TOWN</h1><div class="chips" style="margin:0 0 12px;gap:6px;flex-wrap:wrap">${TT.map(([k,n])=>`<button class="btn small ${t===k?'':'ghost'}" data-tt="${k}" style="width:auto;flex:1;min-width:0;padding:8px 2px;font-size:12px;white-space:nowrap">${n}${(k==='emp'&&dot)||(k==='hall'&&advReady())?'<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#ff9a3a;margin-left:4px;vertical-align:top"></span>':''}</button>`).join('')}</div>`}
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-tt]');if(!b)return;S.townTab=b.dataset.tt;persist();render();$('#town').scrollTop=0});
-function viewHub(){const t=S.townTab||'craft';if(t==='craft'||t==='emp')viewCraft();else viewTown()}
+// ================= ADVENTURERS' HALL =================
+const ROLES={warrior:{n:'Warrior',ic:'🛡',d:'+15% power. Built for hard missions.'},scout:{n:'Scout',ic:'🏹',d:'Missions take 25% less time and bring back 25% more materials.'},hunter:{n:'Treasure Hunter',ic:'💰',d:'+40% gear, currency and map finds, but 5% less power.'}};
+const ADV_NAMES=['Brakka','Imra','Tolven','Sella','Oskar','Vey','Marn','Dessa','Kael','Rowan','Thessaly','Gruff','Pip','Ysolde','Harrow','Neve','Corin','Mabb','Ulric','Fen'];
+const ADV_SLOTS=[['weapon','Weapon',it=>it.slot==='weapon'],['armour','Armour',it=>['body','helmet','gloves','boots'].includes(it.slot)],['trinket','Trinket',it=>['ring','amulet'].includes(it.slot)],['extra','Extra',it=>it.slot!=='weapon']];
+const ADV_TRAITS=[['pow','Battle-hardened','+6% power'],['brk','Careful','25% lower gear break chance'],['spd','Swift','Missions take 15% less time'],['mats','Prospector','+20% materials'],['loot','Lucky','+25% gear and currency finds'],['heal','Tough','Recovers from injuries twice as fast']];
+const HIRE_COST=n=>({copper:400*n,gel:400*n,glowcap:400*n,silk:400*n,starmetal:10*n});
+const BMATS=[['copper','gel'],['glowcap','silk'],['crystal','glowcap'],['ember','crystal'],['voidshard','ember']];
+function advInit(){if(S.adv)return;S.adv={list:[newAdv('warrior',1),newAdv('scout',2)],board:null,seq:3}}
+function newAdv(role,i){const r=Math.random;return{id:'a'+i+'_'+Math.floor(r()*1e6),name:ADV_NAMES[Math.floor(r()*ADV_NAMES.length)],role,lvl:1,xp:0,gear:{},traits:[],hue:Math.floor(r()*360),mis:null,hurtUntil:0}}
+function itemPow(it){if(!it)return 0;return it.ilvl*(1+.1*(it.mods||[]).length+.05*(it.emp||0))*(it.uq?1.25:1)}
+function advTr(a,k){return a.traits.filter(t=>t===k).length}
+function advPow(a){let s=0;for(const [k] of ADV_SLOTS)s+=itemPow(a.gear[k]);return s/4*(1+.04*(a.lvl-1))*(a.role==='warrior'?1.15:a.role==='hunter'?.95:1)*(1+.06*advTr(a,'pow'))}
+function misChance(a,m){const r=advPow(a)/m.d;return Math.max(.05,Math.min(.95,.5+(r-1)*1.6))}
+function misBreak(a,m){const r=advPow(a)/Math.max(1,m.d);return Math.max(.03,Math.min(.5,.08+Math.max(0,1.1-r)*.4))*Math.pow(.75,advTr(a,'brk'))}
+function misHours(a,m){return m.h*(a.role==='scout'?.75:1)*Math.pow(.85,advTr(a,'spd'))}
+function genBoard(){const now=Date.now(),b=Math.max(5,S.best||5),R=Math.random,ms=[];
+  for(const [fr,h] of [[.5,1],[.75,2],[1,4],[1.15,8]]){const d=Math.max(3,Math.round(b*fr*(.9+R()*.2))),bi=biomeOf(d),lo=Math.max(1,d-4);
+    ms.push({id:'m'+Math.floor(R()*1e9),d,h,bi,name:`${['Clear','Scout','Raid','Delve into'][Math.floor(R()*4)]} the ${BIOMES[bi].name.replace(/^The /,'')}`,lo,hi:d+5})}
+  S.adv.board={at:now,ms}}
+function advTick(){advInit();const b=S.adv.board;if(!b||Date.now()-b.at>4*3600e3||!b.ms.length)genBoard()}
+function advReady(){return S.adv&&S.adv.list.some(a=>a.mis&&Date.now()>=a.mis.end)}
+function sendAdv(a,m){const c=misChance(a,m),brk=misBreak(a,m),hrs=misHours(a,m),now=Date.now();
+  a.mis={...m,start:now,end:now+hrs*3600e3,chance:c,brk};S.adv.board.ms=S.adv.board.ms.filter(x=>x.id!==m.id);persist();render()}
+function collectAdv(a){const m=a.mis;if(!m||Date.now()<m.end)return;const R=Math.random,roll=R(),out={mats:{},cur:{},items:[],maps:[],broke:null,res:''};
+  const res=roll<m.chance?'success':roll<m.chance+(1-m.chance)*.5?'partial':'fail',mult=res==='success'?1:res==='partial'?.4:0,hrs=m.h,loot=(a.role==='hunter'?1.4:1)*(1+.25*advTr(a,'loot'));out.res=res;
+  if(mult>0){const mm=(a.role==='scout'?1.25:1)*(1+.2*advTr(a,'mats'));const tot=Math.round((20+m.d*1.5)*hrs*mult*mm);const [m1,m2]=BMATS[m.bi];out.mats[m1]=Math.round(tot*.6);out.mats[m2]=tot-out.mats[m1];
+    if(R()<Math.min(1,hrs*.25*mult))out.mats.starmetal=1+Math.floor(R()*hrs*.5);
+    const pool=['chaos','chaos','void','crown','graft','scour','tinker','ascend','divine'];const nc=Math.round(hrs*1.5*mult*loot);for(let i=0;i<nc;i++){const k=pool[Math.floor(R()*pool.length)];out.cur[k]=(out.cur[k]||0)+1}
+    const ni=Math.floor(hrs*.6*mult*loot+R());for(let i=0;i<ni;i++)out.items.push(genItem(R,Math.max(1,m.d),1.5));
+    if(R()<hrs*.08*mult*loot)out.maps.push(mkMap(R,Math.max(5,m.d+Math.floor(R()*6)),1));
+    if(R()<hrs*.025*mult*loot)out.items.push(mkUnique(UQK[Math.floor(R()*UQK.length)],R,m.d))}
+  const eqd=ADV_SLOTS.map(([k])=>k).filter(k=>a.gear[k]);if(eqd.length&&R()<m.brk){const k=eqd[Math.floor(R()*eqd.length)],it=a.gear[k];if(R()<1/(1+.1*(it.emp||0))){out.broke=it;delete a.gear[k]}}
+  const xp=Math.round(hrs*25*(res==='success'?1:res==='partial'?.6:.3));a.xp+=xp;out.xp=xp;out.lv=[];while(a.xp>=a.lvl*100){a.xp-=a.lvl*100;a.lvl++;out.lv.push(a.lvl);if(a.lvl%3===0){const t=ADV_TRAITS[Math.floor(R()*ADV_TRAITS.length)];a.traits.push(t[0]);out.trait=t}}
+  if(res!=='success')a.hurtUntil=Date.now()+(res==='partial'?1:2+hrs)*3600e3/(1+advTr(a,'heal'));
+  for(const k in out.mats)S.mats[k]=(S.mats[k]||0)+out.mats[k];for(const k in out.cur)S.cur[k]=(S.cur[k]||0)+out.cur[k];
+  let sal=0;for(const it of out.items){if(S.inv.length<S.invCap)S.inv.push(it);else{sal++;const sm=salvageMats(it);for(const k in sm)S.mats[k]=(S.mats[k]||0)+sm[k]}}
+  for(const mp of out.maps)if(S.maps.length<30)S.maps.push(mp);
+  a.mis=null;persist();
+  const nm=k=>(MATS[k]||{}).n||k,ch=(k,n,c)=>`<span class="chip" style="color:${c||'#e2dccf'}">${n} ${k}</span>`;
+  let h=`<div class="note" style="margin-bottom:8px">${m.name} (depth ${m.lo}–${m.hi}, ${m.h}h)</div>`;
+  h+=`<div style="font-size:20px;font-weight:800;margin-bottom:8px;color:${res==='success'?'#5dd68c':res==='partial'?'#ffd36a':'#ff8a7a'}">${res==='success'?'Success!':res==='partial'?'Partial success: came back hurt':'Failed: came back empty-handed and hurt'}</div>`;
+  const parts=[...Object.entries(out.mats).map(([k,n])=>ch(nm(k),n,(MATS[k]||{}).c)),...Object.entries(out.cur).map(([k,n])=>ch(CUR[k].n,n,'#ffd36a')),...out.items.map(it=>ch(itemName(it),'',RCOL[it.rarity])),...out.maps.map(mp=>ch(`Delve Map (Floor ${mp.floor})`,'','#c08aff'))];
+  if(parts.length)h+=`<div class="chips" style="flex-wrap:wrap;gap:6px;margin-bottom:8px">${parts.join('')}</div>`;
+  if(sal)h+=`<div class="note">Inventory full: ${sal} item${sal>1?'s were':' was'} salvaged into materials.</div>`;
+  if(out.broke)h+=`<div class="note warn" style="margin-top:6px">💥 ${a.name}'s <b style="color:${RCOL[out.broke.rarity]}">${itemName(out.broke)}</b> broke on the mission and is gone.</div>`;
+  h+=`<div class="note" style="margin-top:6px">+${out.xp} XP${out.lv.length?` · <b>Level ${out.lv[out.lv.length-1]}!</b>`:''}${out.trait?` · New trait: <b>${out.trait[1]}</b> (${out.trait[2]})`:''}</div>`;
+  SFX.play(res==='success'?'escape':'hurt');modal(`${a.name} is back`,h,[{label:'Nice',fn:render}])}
+function advGearPick(a,slot){const S0=ADV_SLOTS.find(x=>x[0]===slot),cands=S.inv.filter(it=>S0[2](it)&&!it.fav).sort((x,y)=>itemPow(y)-itemPow(x)).slice(0,40);
+  let h=`<div class="note" style="margin-bottom:8px">Gear given to adventurers leaves your inventory and can break on missions. Favorited items can't be used. Empowered items break less often.</div>`;
+  if(a.gear[slot])h+=`<button class="btn ghost" data-ag="__un">Take back ${itemName(a.gear[slot])}</button>`;
+  h+=cands.length?cands.map(it=>`<button class="btn ghost" style="display:flex;justify-content:space-between;text-align:left;margin-top:6px" data-ag="${it.uid}"><span style="color:${RCOL[it.rarity]}">${itemName(it)}<br><small style="color:#9a90a8">${BASES[it.base].n} · ilvl ${it.ilvl}</small></span><b>${Math.round(itemPow(it))}</b></button>`).join(''):'<div class="note">No suitable items in your inventory.</div>';
+  modal(`${a.name}: ${S0[1]}`,h,[{label:'Close',cls:'ghost'}]);
+  document.querySelectorAll('[data-ag]').forEach(b=>b.onclick=()=>{const v=b.dataset.ag;if(v==='__un'){if(S.inv.length>=S.invCap){toast('Inventory full');return}S.inv.push(a.gear[slot]);delete a.gear[slot]}
+    else{const it=S.inv.find(i=>String(i.uid)===v);if(!it)return;if(a.gear[slot]){if(S.inv.length>=S.invCap+1){toast('Inventory full');return}S.inv.push(a.gear[slot])}S.inv=S.inv.filter(i=>i!==it);a.gear[slot]=it}
+    $('#modal').classList.add('hidden');paused=false;persist();render()})}
+function fmtDur(ms){const t=Math.ceil(Math.max(0,ms)/60e3),h=Math.floor(t/60),m=t%60;return h?`${h}h ${m}m`:`${m}m`}
+function viewHall(){advTick();const A=S.adv,now=Date.now();let h=hubBar();
+  h+=`<div class="card"><h3>Adventurers' Hall</h3><div class="note">Equip adventurers with spare gear and send them on missions. They keep going while the game is closed. Gear can break on missions, so keep crafting replacements.</div></div>`;
+  for(const a of A.list){const busy=!!a.mis,done=busy&&now>=a.mis.end,hurt=!busy&&a.hurtUntil>now,R=ROLES[a.role];
+    h+=`<div class="card"><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><div style="width:42px;height:42px;border-radius:50%;background:hsl(${a.hue},45%,38%);display:flex;align-items:center;justify-content:center;font-size:20px">${R.ic}</div>
+      <div style="flex:1"><b style="font-size:16px">${a.name}</b> <span class="note">${R.n} · Lv ${a.lvl} <small>(${a.xp}/${a.lvl*100} XP)</small></span><br><span class="note">Power <b style="color:#ffd36a">${Math.round(advPow(a))}</b>${a.traits.length?' · '+[...new Set(a.traits)].map(t=>{const T=ADV_TRAITS.find(x=>x[0]===t),n=advTr(a,t);return `<span title="${T[2]}">${T[1]}${n>1?' ×'+n:''}</span>`}).join(', '):''}</span></div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">${ADV_SLOTS.map(([k,n])=>{const it=a.gear[k];return `<button class="btn ghost small" style="text-align:left;min-height:44px" data-aslot="${a.id}:${k}" ${busy?'disabled':''}><small style="color:#9a90a8">${n}</small><br>${it?`<span style="color:${RCOL[it.rarity]}">${itemName(it)}</span>`:'<span style="color:#6f6680">empty</span>'}</button>`}).join('')}</div>`;
+    if(done)h+=`<button class="btn" style="margin-top:8px" data-acol="${a.id}">✓ ${a.mis.name}: collect results</button>`;
+    else if(busy)h+=`<div class="note" style="margin-top:8px">On mission: <b>${a.mis.name}</b> · back in <b>${fmtDur(a.mis.end-now)}</b> · ${Math.round(a.mis.chance*100)}% success</div>`;
+    else if(hurt)h+=`<div class="note warn" style="margin-top:8px">Injured: recovering for ${fmtDur(a.hurtUntil-now)}</div>`;
+    else h+=`<div class="note" style="margin-top:8px">Ready. Pick a mission below.</div>`;
+    h+=`</div>`}
+  const free=A.list.filter(a=>!a.mis&&!(a.hurtUntil>now)&&ADV_SLOTS.some(([k])=>a.gear[k]));
+  h+=`<div class="card"><h3>Mission board</h3><div class="note" style="margin-bottom:8px">New missions every 4 hours · refreshes in ${fmtDur(A.board.at+4*3600e3-now)}</div>`;
+  h+=A.board.ms.length?A.board.ms.map(m=>`<div class="recipe"><div class="rhead"><span class="rname">${m.name}</span><span class="rhave">${m.h}h</span></div><div class="note">Depth ${m.lo}–${m.hi} · difficulty ${m.d}</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${A.list.map(a=>{const ok=free.includes(a);if(!ok)return'';const c=misChance(a,m),b=misBreak(a,m);return `<button class="btn small ${c>=.6?'':'ghost'}" data-asend="${a.id}:${m.id}" style="width:auto;flex:1">Send ${a.name}<br><small>${Math.round(c*100)}% success · ${Math.round(b*100)}% break · ${fmtDur(misHours(a,m)*3600e3)}</small></button>`}).join('')||'<span class="note">No adventurer ready (they need at least one piece of gear and can\'t be injured or away).</span>'}</div></div>`).join(''):'<div class="note">All missions taken. New ones soon.</div>';
+  h+=`</div>`;
+  if(A.list.length<5){const n=A.list.length-1,c=HIRE_COST(n),can=Object.entries(c).every(([k,v])=>(S.mats[k]||0)>=v);
+    h+=`<div class="card"><h3>Hire an adventurer (${A.list.length}/5)</h3><div class="chips" style="flex-wrap:wrap;gap:6px;margin-bottom:8px">${Object.entries(c).map(([k,v])=>`<span class="chip" style="color:${(S.mats[k]||0)>=v?MATS[k].c:'#ff8a7a'}">${v} ${MATS[k].n}</span>`).join('')}</div>
+      ${Object.entries(ROLES).map(([k,R])=>`<button class="btn ${can?'':'ghost'}" style="margin-top:6px;text-align:left" data-ahire="${k}" ${can?'':'disabled'}>${R.ic} Hire a ${R.n}<br><small>${R.d}</small></button>`).join('')}</div>`}
+  $('#view').innerHTML=h;
+  document.querySelectorAll('[data-aslot]').forEach(b=>b.onclick=()=>{const[id,k]=b.dataset.aslot.split(':');advGearPick(A.list.find(a=>a.id===id),k)});
+  document.querySelectorAll('[data-acol]').forEach(b=>b.onclick=()=>collectAdv(A.list.find(a=>a.id===b.dataset.acol)));
+  document.querySelectorAll('[data-asend]').forEach(b=>b.onclick=()=>{const[id,mid]=b.dataset.asend.split(':');sendAdv(A.list.find(a=>a.id===id),A.board.ms.find(m=>m.id===mid))});
+  document.querySelectorAll('[data-ahire]').forEach(b=>b.onclick=()=>{const c=HIRE_COST(A.list.length-1);for(const k in c)S.mats[k]-=c[k];A.list.push(newAdv(b.dataset.ahire,A.seq++));persist();render();toast('New adventurer hired!')});
+  clearTimeout(viewHall.t);if(A.list.some(a=>a.mis||a.hurtUntil>now))viewHall.t=setTimeout(()=>{if(S.tab==='refine'&&S.townTab==='hall'&&$('#modal').classList.contains('hidden'))viewHall()},30000)}
+
+function viewHub(){const t=S.townTab||'craft';if(t==='hall')viewHall();else if(t==='craft'||t==='emp')viewCraft();else viewTown()}
 function render(){if(S.tab==='craft'){S.tab='refine';S.townTab='craft'}if(S.tab!=='social')socOff();({run:viewRun,gear:viewGear,tree:viewTree,refine:viewHub,social:viewSocial,guide:viewGuide})[S.tab||'run']();tutTick()}
 const TUT=[
   {id:'run',t:'Send your first run',d:'On the Run tab, tap <b>Single run</b> and watch your runner fight, mine ore and grab loot. It comes back automatically.',tab:'run',sel:'#liveBtn',done:()=>S.runs>0},
