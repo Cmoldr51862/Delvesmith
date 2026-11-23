@@ -381,7 +381,7 @@ const skN=(k,el)=>(SKN[k]&&el&&SKN[k][el])||SKILLS[k].n;
 const EL={fire:{c:'#ff9a4a',g:'rgba(255,140,50,.35)',core:'#ffd070',n:'Fire'},cold:{c:'#8fd3ff',g:'rgba(120,200,255,.35)',core:'#e6f6ff',n:'Frost'},poison:{c:'#8fe36b',g:'rgba(120,220,90,.35)',core:'#dfffc8',n:'Poison'}};
 const mkCurve=(a,b,c,t,T)=>{const C=[1,1],L=Math.log;return f=>{f=Math.max(1,Math.floor(f));while(C.length<=f){const i=C.length-1;C.push(C[i]*Math.exp(L(c)+(L(b)-L(c))*Math.exp(-(i-1)/T)+(L(a)-L(b))*Math.exp(-(i-1)/t)))}return C[f]}};
 const hpCurve0=mkCurve(1.2,1.11,1.032,14,25),dmgCurve0=mkCurve(1.14,1.082,1.024,14,25),DEEP0=55;
-const hpCurve=f=>hpCurve0(f)*Math.pow(1.02,Math.max(0,Math.floor(f)-DEEP0)),dmgCurve=f=>dmgCurve0(f)*Math.pow(1.015,Math.max(0,Math.floor(f)-DEEP0));
+const hpCurve=f=>hpCurve0(f)*Math.pow(1.005,Math.max(0,Math.floor(f)-DEEP0)),dmgCurve=f=>dmgCurve0(f)*Math.pow(1.00375,Math.max(0,Math.floor(f)-DEEP0));
 const mHP=f=>25*hpCurve(f),mDMG=f=>6*dmgCurve(f);
 const ramp=(f,k)=>Math.pow(k,Math.max(0,f-10)),wHP=f=>25*Math.pow(1.17,f-1)*Math.pow(1.2,bidxOf(f))*ramp(f,1.09),wDMG=f=>6*Math.pow(1.13,f-1)*Math.pow(1.17,bidxOf(f))*ramp(f,1.07);
 const danger=f=>Math.round(mHP(f)/25*10)/10;
