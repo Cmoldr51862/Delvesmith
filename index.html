@@ -520,6 +520,8 @@ for(const k in AFF)for(const t of AFF[k].t)t[0]=REMAP_T[t[0]]||t[0];
  for(const k of Object.keys(BASES).filter(k=>BASES[k].f===20)){const b=BASES[k];MAT.forEach(([pk,pn,f],i)=>{const m=Math.pow(1.25,i+1),ma=Math.pow(1.5,i+1),im=Math.pow(1.22,i+1),nb={...b,n:b.n.replace(/^Void /,pn+' '),f};
    if(nb.n===b.n)nb.n=pn+' '+b.n;if(b.min!=null){nb.min=Math.round(b.min*m);nb.max=Math.round(b.max*m)}if(b.armour)nb.armour=Math.round(b.armour*ma);
    if(b.imp){nb.imp={};for(const a in b.imp)nb.imp[a]=a==='dodge'||a==='ms'||a==='bagCap'||/Res$/.test(a)?Math.round(b.imp[a]*Math.pow(1.1,i+1)):Math.round(b.imp[a]*im)}BASES[pk+'_'+k]=nb})}}
+{// vital body armours: half the Armour, Life as a base stat
+  for(const k of Object.keys(BASES).filter(k=>BASES[k].slot==='body')){const b=BASES[k],nb={...b,n:'Vital '+b.n,vital:1,dw:(b.dw||1)*.6};if(b.armour)nb.armour=Math.round(b.armour*.5);if(b.imp&&b.imp.armour){nb.imp={...b.imp,armour:Math.round(b.imp.armour*.5)}}BASES['vital_'+k]=nb}}
 const rr=v=>`${Math.max(1,Math.round(v*.75))}–${Math.max(1,Math.round(v*1.25))}`;
 const DESC={addPhys:v=>`Adds ${rr(v)} Physical Damage`,incPhys:v=>`${v}% increased Physical Damage`,addFire:v=>`Adds ${rr(v)} Fire Damage`,addCold:v=>`Adds ${rr(v)} Cold Damage`,addPoison:v=>`Adds ${rr(v)} Poison Damage`,
   life:v=>`+${v} to maximum Life`,armour:v=>`+${v} to Armour`,incArmour:v=>`${v}% increased Armour`,ms:v=>`${v}% increased Movement Speed`,
@@ -757,12 +759,13 @@ function itemHTML(it,newMods){
 // ================= STATS =================
 const LOCALW=['addPhys','incPhys','incAps','incCrit'];
 var uqBaseC={};
-function ibase(it){const b=BASES[it.base],il=it.ilvl||1,deep=il>80;if((!it.uq||il<=b.f)&&!deep)return b;const ck=it.base+'@'+il+(it.uq?'u':'');if(uqBaseC[ck])return uqBaseC[ck];
+function ibase(it){const b=BASES[it.base],il=it.ilvl||1,deep=il>80,needLife=b.slot==='belt'||b.vital;if((!it.uq||il<=b.f)&&!deep&&!needLife)return b;const ck=it.base+'@'+il+(it.uq?'u':'');if(uqBaseC[ck])return uqBaseC[ck];
   const nb={...b};
   if(it.uq&&il>b.f){let ref=null,rp=0;const pw=x=>x.min!=null?(x.min+x.max)*x.aps:(x.armour||0);
     for(const k in BASES){const x=BASES[k];if(x.slot!==b.slot||x.cls!==b.cls||x.f>il)continue;const v=pw(x);if(v>rp){rp=v;ref=x}}
     const own=pw(b);if(ref&&own>0&&rp>own){const k=rp/own;if(b.min!=null){nb.min=Math.round(b.min*k);nb.max=Math.round(b.max*k)}else nb.armour=Math.round(b.armour*k)}}
   if(deep){const k=1+.01*(il-80);if(nb.min!=null){nb.min=Math.round(nb.min*k);nb.max=Math.round(nb.max*k)}if(nb.armour)nb.armour=Math.round(nb.armour*k)}
+  if(needLife){const lv=Math.round((b.vital?6:4)*il*(deep?1+.01*(il-80):1));nb.imp={life:((b.imp&&b.imp.life)||0)+lv,...Object.fromEntries(Object.entries(b.imp||{}).filter(([k])=>k!=='life'))}}
   return uqBaseC[ck]=nb}
 function uqScale(a,il){const top=l=>{const t=AFF[a].t.filter(t=>t[0]<=l);return t[t.length-1][2]};return il>20?top(il)/top(20):1}
 function localStats(it){
@@ -1915,7 +1918,7 @@ function updIdleCard(){
 const SORTS={recent:'Newest first',old:'Oldest first',rarity:'Rarity',ilvl:'Item level',dps:'Highest DPS (weapons)',armour:'Highest armour',slot:'Slot',fav:'Favorites first',emp:'Empower level'};
 let invQ='';
 const RNAME=['normal','magic','rare','unique'];
-function itemText(it){const b=BASES[it.base];let t=[itemName(it),b.n,SLOTN[it.slot],RNAME[it.rarity],b.cls||'',it.fav?'favorite':'',it.adv?'adventurer saved':'',it.emp?'empowered':''];
+function itemText(it){const b=ibase(it);let t=[itemName(it),b.n,SLOTN[it.slot],RNAME[it.rarity],b.cls||'',it.fav?'favorite':'',it.adv?'adventurer saved':'',it.emp?'empowered':''];
   if(b.imp)for(const k in b.imp)t.push(DESC[k](b.imp[k]));for(const m of it.mods)t.push(DESC[m.a](m.v));if(it.uq)t.push(UNIQ[it.uq].n||'',UNIQ[it.uq].d);
   return t.join(' ').replace(/<[^>]*>/g,'').toLowerCase()}
 function invMatch(it){const q=invQ.trim().toLowerCase();if(!q)return true;const t=itemText(it);return q.split(/\s+/).every(w=>t.includes(w))}
