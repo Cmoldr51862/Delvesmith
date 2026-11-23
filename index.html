@@ -1733,7 +1733,7 @@ function viewGuide(){
   h+=sec('Runs, expeditions and retreating',`<p style="margin:0 0 8px"><b>Single run:</b> watch now, with speed controls, a Bag button to drop loot, and a Pull out button.</p>
     <p style="margin:0 0 8px"><b>Idle expedition:</b> back-to-back runs for 15 minutes to 8 hours, with a 4-minute rest between runs. Watch live anytime, or Recall early. Normal items are salvaged automatically.</p>
     <p style="margin:0 0 8px"><b>Dying</b> loses everything in the bag, unless a <b>charm</b> saves part of it. Your stash at home is always safe.</p>
-    <p style="margin:0"><b>Retreat settings:</b> "Retreat at HP" turns back mid-floor, "Go deeper only above" decides at each exit. Hitting the retreat line breaks off any fight right away and runs for the entrance. "Target floor" and "Leave when bag is full" also end a run. Beat a floor to unlock starting on the next one.</p>`);
+    <p style="margin:0"><b>Retreat settings:</b> "Retreat at HP" turns back mid-floor, "Go deeper only above" decides at each exit (single runs only; idle expeditions stop at your checkpoint floor). Hitting the retreat line breaks off any fight right away and runs for the entrance. "Target floor" and "Leave when bag is full" also end a run. Beat a floor to unlock starting on the next one.</p>`);
   h+=sec('Damage, biomes and resistances',`<p style="margin:0 0 8px">Each biome hits with a different damage type. Its monsters also resist one type, so your own damage type matters too.</p>${BIOMES.map(b=>`<div class="row" style="display:block"><b>Floors ${b.floors} · ${b.name}</b><div class="note">Hits with ${Object.keys(b.split).map(k=>`<span style="color:${TCOL[k]}">${TNAME[k]}</span>`).join(' + ')}${Object.keys(b.eres).length?' · monsters resist '+Object.keys(b.eres).map(k=>TNAME[k]).join(', '):''}</div></div>`).join('')}
     <p style="margin:8px 0 0"><b>Armour</b> reduces Physical damage. <b>Resistances</b> (max 75%) reduce Poison, Cold and Fire damage. The run report shows what hurt you most.</p>`);
   h+=sec('Monsters and traps',`<ul style="padding-left:18px;margin:0">
@@ -1817,9 +1817,9 @@ function viewRun(){
       <button class="btn ghost small" id="skipBtn" style="margin-top:10px">Skip 1 hour (testing)</button>`}</div>`;
   }else{
     h+=`<div class="card"><h3>Send the runner</h3>
-      <div class="set"><div>Start at checkpoint<small>Every biome start you reach unlocks (${checkpoints().join(', ')})</small></div><div class="step"><button data-st="startFloor" data-d="-1">−</button><b>${s.startFloor}<small style="display:block;font-size:10px;color:var(--dim);font-weight:600">${bname(s.startFloor)}</small></b><button data-st="startFloor" data-d="1">+</button></div></div>
+      <div class="set"><div>Start at checkpoint<small>Idle expeditions never go deeper than this. Every biome start you reach unlocks (${checkpoints().join(', ')})</small></div><div class="step"><button data-st="startFloor" data-d="-1">−</button><b>${s.startFloor}<small style="display:block;font-size:10px;color:var(--dim);font-weight:600">${bname(s.startFloor)}</small></b><button data-st="startFloor" data-d="1">+</button></div></div>
       <div class="set"><div>Retreat at HP<small>Mid-floor: turn back to the entrance below this.</small></div><div class="step"><button data-st="retreat" data-d="-10">−</button><b>${s.retreat?s.retreat+'%':'Never'}</b><button data-st="retreat" data-d="10">+</button></div></div>
-      <div class="set"><div>Go deeper only above<small>At the end of a floor, take the exit if HP is below this. Each new floor heals 25%.</small></div><div class="step"><button data-st="descendHp" data-d="-10">−</button><b>${s.descendHp?s.descendHp+'%':'Always'}</b><button data-st="descendHp" data-d="10">+</button></div></div>
+      <div class="set"><div>Go deeper only above<small>Single runs only. At the end of a floor, take the exit if HP is below this. Each new floor heals 25%.</small></div><div class="step"><button data-st="descendHp" data-d="-10">−</button><b>${s.descendHp?s.descendHp+'%':'Always'}</b><button data-st="descendHp" data-d="10">+</button></div></div>
 
       <div class="set"><div>Leave when bag is full<small>Bag holds ${st.bag}</small></div><button class="toggle ${s.leaveFull?'on':''}" id="tglFull"></button></div>
       <div class="set"><div>Swap out junk when full<small>Drops the least valuable thing in the bag to grab something better</small></div><button class="toggle ${s.autoSwap?'on':''}" id="tglSwap"></button></div>
@@ -2252,7 +2252,7 @@ function idleNowText(){const I=S.idle;if(idleElapsed()<I.doneT)return `Resting i
     const seen=cur.log.filter(l=>l.t<=idleElapsed()-I.doneT),f=seen.length?seen[seen.length-1].f:idleSet(I.runs.length).startFloor;return `Run ${I.runs.length+1} · Depth ${f}`}
 function soFarText(){const P=S.idle.pool;return `${P.runs} runs · ${P.escapes} escaped · ${P.deaths} died · ${P.units} banked`}
 function idleRot(start){const cps=checkpoints().filter(f=>f<=start),by={};for(const f of cps)by[biomeOf(f)]=f;const b0=biomeOf(start),out=[];for(let k=0;k<5;k++){const b=(b0+k)%5;if(by[b])out.push(by[b])}return out.length?out:[start]}
-function idleSet(i){const I=S.idle,r=I.rot||[I.set.startFloor];return {...I.set,startFloor:r[i%r.length]}}
+function idleSet(i){const I=S.idle,r=I.rot||[I.set.startFloor],cap=I.set.startFloor||1;return {...I.set,startFloor:Math.min(cap,r[i%r.length]),target:cap,descendHp:0}}
 function simIdleRun(i){const s=new Sim(idleSeed(i),S.idle.st,idleSet(i),false);s.auto=true;let g=0;while(!s.done&&g++<200000)s.step(IDLE_DT);const r=s.summary();r.tx=s.t;return r}
 function commitRun(r){
   const I=S.idle,P=I.pool,died=r.outcome==='died';let frac=1;
