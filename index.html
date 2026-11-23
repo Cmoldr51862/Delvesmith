@@ -2289,7 +2289,7 @@ function collectIdle(){
   {const gb=guildBuffPct();for(const k in P.mats)S.mats[k]=(S.mats[k]||0)+Math.floor(P.mats[k]*(1+gb/100))}
   let sal=0;for(const it of P.items){if(S.inv.length<S.invCap)S.inv.push(it);else{const m=salvageMats(it);for(const k in m)S.mats[k]=(S.mats[k]||0)+m[k];sal++}}
   if(I.charmUsed)S.charm=null;
-  S.runs+=P.runs;{const pb=S.best;S.best=Math.max(S.best,P.deep);bestUp(pb)}S.cleared=Math.max(S.cleared||0,P.cleared);for(const m of P.maps||[])if(S.maps.length<30)S.maps.push(m);for(const k in P.cur||{})S.cur[k]=(S.cur[k]||0)+P.cur[k];const ups=gainXP((P.xp||0)*(1+.1*(S.town.training||0)));S.bossKills=(S.bossKills||0)+(P.bosses||0);
+  S.runs+=P.runs;for(const m of P.maps||[])if(S.maps.length<30)S.maps.push(m);for(const k in P.cur||{})S.cur[k]=(S.cur[k]||0)+P.cur[k];const ups=gainXP((P.xp||0)*(1+.1*(S.town.training||0)));S.bossKills=(S.bossKills||0)+(P.bosses||0);
   const rep={exp:true,dur:I.dur,recalled:!!I.recalled,runs:P.runs,deaths:P.deaths,escapes:P.escapes,floor:P.deep,kills:P.kills,mats:P.mats,items:P.items,salv:P.salv,fullSalv:sal,lost:P.lost,
     taken:P.taken,avgKill:P.kills?P.killT/P.kills:0,lostFull:P.lostFull,swapped:P.swapped,outcome:P.deaths?'died':'escaped',charmName:I.charmUsed?I.charm.n:null,history:I.runs.slice(-40),logTail:I.lastLog||[],mapsN:(P.maps||[]).length,xp:P.xp||0,bosses:P.bosses||0,levelUps:ups,newLvl:S.lvl};
   try{guildWeekCount({cleared:1,startFloor:1});S.gw.n+=(P.fl||0)-1;clearTimeout(pushMember.t);pushMember.t=setTimeout(pushMember,1500)}catch(e){}
