@@ -252,12 +252,12 @@ const TREE=[
   {id:'s6a',b:3,r:5,x:-1,n:'Searing',max:3,st:{eleDmg:10},req:['s5']},
   {id:'s6b',b:3,r:5,x:1,n:'Lingering Magic',max:3,st:{areaInc:10},req:['s5']},
   {id:'s7',b:3,r:6,x:0,n:'Archmage',max:1,kind:'key',st:{spellDmg:40,archmage:1},req:['s6a','s6b'],d:'+40% spell damage, but 20% less maximum Life.'},
-  {id:'f1',b:1,r:0,x:0,n:'Toughness',max:3,st:{life:8}},
+  {id:'f1',b:1,r:0,x:0,n:'Toughness',max:3,st:{treeLife:4}},
   {id:'f2',b:1,r:1,x:0,n:'Hardened',max:3,st:{treeArmour:8},req:['f1']},
   {id:'f3a',b:1,r:2,x:-1,n:'Warded',max:3,st:{allRes:4},req:['f2']},
-  {id:'f3b',b:1,r:2,x:1,n:'Mending',max:3,st:{regen:.5},req:['f2']},
+  {id:'f3b',b:1,r:2,x:1,n:'Mending',max:3,st:{treeRegen:.4},req:['f2']},
   {id:'f4',b:1,r:3,x:0,n:'Second Wind',max:1,kind:'notable',st:{secondWind:1},req:['f3a','f3b'],d:'Once per floor, when Life drops below 25%, instantly heal 30%.'},
-  {id:'f5',b:1,r:4,x:0,n:'Vitality',max:3,st:{life:12},req:['f4']},
+  {id:'f5',b:1,r:4,x:0,n:'Vitality',max:3,st:{treeLife:5},req:['f4']},
   {id:'f6a',b:1,r:5,x:-1,n:'Bulwark',max:3,st:{treeArmour:10},req:['f5']},
   {id:'f6b',b:1,r:5,x:1,n:'Elemental Ward',max:3,st:{allRes:5},req:['f5']},
   {id:'f7',b:1,r:6,x:0,n:'Unbreakable',max:1,kind:'key',st:{unbreak:1},req:['f6a','f6b'],d:'Take 15% less damage from everything.'},
@@ -297,7 +297,7 @@ for(const c of Object.keys(WCLASS)){
 const TBR=[{n:'MIGHT',c:'#ff8a6a',d:'Attack damage: everything except staves'},{n:'FORTITUDE',c:'#8fb0ff',d:'Life, Armour and resistances'},{n:'CUNNING',c:'#7ee36b',d:'Dodge, speed, loot and cooldowns'},{n:'SORCERY',c:'#b48cff',d:'Spell damage: staff bolts and staff skills, plus elemental damage'},{n:'WEAPONS',c:'#ffd36a',d:'Bonuses for one weapon type. They only work while that weapon is equipped.'}];
 const TSD={attackDmg:v=>`+${v}% attack damage`,spellDmg:v=>`+${v}% spell damage`,eleDmg:v=>`+${v}% elemental damage (fire, cold, poison)`,castSpd:v=>`+${v}% staff attack speed`,rangeInc:v=>`+${v}% staff and bow range`,areaInc:v=>`+${v}% skill area`,clsDmg:v=>`+${v}% damage`,
   incAps:v=>`+${v}% attack speed`,incCrit:v=>`+${v}% increased crit chance`,critMulti:v=>`+${v}% crit damage`,skillDmg:v=>`+${v}% skill damage`,
-  life:v=>`+${v} maximum Life`,treeArmour:v=>`+${v}% Armour`,allRes:v=>`+${v}% to all resistances`,regen:v=>`+${v} Life regenerated per second`,dodge:v=>`+${v}% Hazard Dodge`,ms:v=>`+${v}% movement speed`,lootFind:v=>`+${v}% material quantity`,bagCap:v=>`+${v} bag capacity`};
+  life:v=>`+${v} maximum Life`,treeLife:v=>`+${v}% increased maximum Life`,treeRegen:v=>`Regenerate ${v}% of maximum Life per second`,treeArmour:v=>`+${v}% Armour`,allRes:v=>`+${v}% to all resistances`,regen:v=>`+${v} Life regenerated per second`,dodge:v=>`+${v}% Hazard Dodge`,ms:v=>`+${v}% movement speed`,lootFind:v=>`+${v}% material quantity`,bagCap:v=>`+${v} bag capacity`};
 const xpNeed=l=>Math.round(15*Math.pow(l,1.5));
 const treeSpent=()=>Object.values(S.tree||{}).reduce((a,b)=>a+b,0);
 const treePts=()=>(S.lvl||1)-1-treeSpent();
@@ -780,7 +780,7 @@ function localStats(it){
   return o;
 }
 function computeStats(eq){
-  const s={incDmg:0,skillDmg:0,treeArmour:0,allRes:0,cdr:0,berserk:0,bloodlust:0,secondWind:0,execute:0,unbreak:0,treasure:0,dodge:0,life:80,armour:0,incArmour:0,addPhys:0,incPhys:0,addFire:0,addCold:0,addPoison:0,incAps:0,incCrit:0,critMulti:150,fireRes:0,coldRes:0,poisonRes:0,regen:0,lifeOnHit:0,lootFind:0,ms:0,bagCap:0};
+  const s={incDmg:0,skillDmg:0,treeArmour:0,treeLife:0,treeRegen:0,allRes:0,cdr:0,berserk:0,bloodlust:0,secondWind:0,execute:0,unbreak:0,treasure:0,dodge:0,life:80,armour:0,incArmour:0,addPhys:0,incPhys:0,addFire:0,addCold:0,addPoison:0,incAps:0,incCrit:0,critMulti:150,fireRes:0,coldRes:0,poisonRes:0,regen:0,lifeOnHit:0,lootFind:0,ms:0,bagCap:0};
   let w=null;
   for(const sl of EQ){const it=eq[sl];if(!it)continue;const b=ibase(it),L=localStats(it);
     if(L.armour)s.armour+=L.armour;
@@ -791,7 +791,7 @@ function computeStats(eq){
   for(const n of TREE){if(n.cls&&n.cls!==wclass)continue;const r=(S.tree&&S.tree[n.id])||0;if(r)for(const k in n.st)s[k]=(s[k]||0)+n.st[k]*r}
   if(wclass==='staff'){s.spellDmg=(s.spellDmg||0)+(s.clsDmg||0);s.incAps+=(s.castSpd||0)}else s.attackDmg=(s.attackDmg||0)+(s.clsDmg||0);
   if(!w)w={min:2,max:4,aps:1.2,crit:5};
-  const o={wclass,sEl,att:sEl&&s['att_'+sEl]?sEl:null,u:Object.fromEntries(EQ.map(k=>eq[k]).filter(i=>i&&i.uq).map(i=>[UNIQ[i.uq].fx,1])),m:Object.fromEntries(Object.keys(s).filter(k=>k.startsWith('mod_')&&s[k]).map(k=>[k.slice(4),1])),attackDmg:s.attackDmg||0,spellDmg:s.spellDmg||0,eleDmg:s.eleDmg||0,rangeInc:s.rangeInc||0,areaInc:s.areaInc||0,surge:s.surge||0,archmage:s.archmage||0,skillDmg:s.skillDmg,cdr:s.cdr,berserk:s.berserk,bloodlust:s.bloodlust,secondWind:s.secondWind,execute:s.execute,unbreak:s.unbreak,treasure:s.treasure,life:Math.round(s.life),armour:Math.round(s.armour*(1+s.treeArmour/100)),wmin:w.min,wmax:w.max,aps:Math.round(w.aps*(1+s.incAps/100)*100)/100,
+  const o={wclass,sEl,att:sEl&&s['att_'+sEl]?sEl:null,u:Object.fromEntries(EQ.map(k=>eq[k]).filter(i=>i&&i.uq).map(i=>[UNIQ[i.uq].fx,1])),m:Object.fromEntries(Object.keys(s).filter(k=>k.startsWith('mod_')&&s[k]).map(k=>[k.slice(4),1])),attackDmg:s.attackDmg||0,spellDmg:s.spellDmg||0,eleDmg:s.eleDmg||0,rangeInc:s.rangeInc||0,areaInc:s.areaInc||0,surge:s.surge||0,archmage:s.archmage||0,skillDmg:s.skillDmg,cdr:s.cdr,berserk:s.berserk,bloodlust:s.bloodlust,secondWind:s.secondWind,execute:s.execute,unbreak:s.unbreak,treasure:s.treasure,life:Math.round(s.life*(1+s.treeLife/100)),armour:Math.round(s.armour*(1+s.treeArmour/100)),wmin:w.min,wmax:w.max,aps:Math.round(w.aps*(1+s.incAps/100)*100)/100,
     crit:Math.round(w.crit*(1+s.incCrit/100)*10)/10,critMulti:s.critMulti,addPhys:s.addPhys,incPhys:s.incPhys,addFire:s.addFire,addCold:s.addCold,addPoison:s.addPoison,
     res:{phys:0,fire:Math.min(75,s.fireRes+s.allRes),cold:Math.min(75,s.coldRes+s.allRes),poison:Math.min(75,s.poisonRes+s.allRes)},resRaw:{fire:s.fireRes+s.allRes,cold:s.coldRes+s.allRes,poison:s.poisonRes+s.allRes},regen:Math.round(s.regen*10)/10,lifeOnHit:s.lifeOnHit,
     lootFind:s.lootFind,ms:s.ms,speed:150*(1+s.ms/100),bag:Math.floor(25+s.bagCap),dodge:Math.min(80,s.dodge)};
@@ -801,6 +801,7 @@ function computeStats(eq){
   if(o.execute)o.armour=Math.round(o.armour*.9);
   const pr=S.prestige||0;if(pr){o.life=Math.round(o.life*(1+.03*pr));o.attackDmg+=3*pr;o.spellDmg+=3*pr}
   const im=1+(wclass==='staff'?o.spellDmg:o.attackDmg)/100,em=1+o.eleDmg/100;o.dps=Math.round((phys+ele*em)*o.aps*cf*im*10)/10;o.physDps=phys*o.aps*cf*im;o.ele={fire:o.addFire,cold:o.addCold,poison:o.addPoison};
+  if(s.treeRegen)o.regen=Math.round((o.regen+o.life*s.treeRegen/100)*10)/10;
   if(o.u.eyedeep){const k=eyeMul(S.best||0);if(k>1){o.eyeK=k;o.life=Math.round(o.life*k);o.dps=Math.round(o.dps*k*10)/10}}
   return o;
 }
