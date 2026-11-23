@@ -1650,12 +1650,16 @@ function advGiveBest(a){const r=advBestKit(a);if(!r.ch.length||r.to<=r.from){toa
   h+=r.ch.map(c=>`<div class="row"><b>${c.n}</b><span>${c.old?`<s style="color:#9a90a8">${itemName(c.old)}</s> → `:''}<span style="color:${RCOL[c.nw.rarity]}">${itemName(c.nw)}</span></span></div>`).join('');
   modal(`Best gear for ${a.name}`,h,[{label:'Equip it',fn:()=>{if(S.inv.length+back-take>S.invCap){toast('Inventory full');return}
     for(const c of r.ch){if(c.old&&!Object.values(r.g).includes(c.old))S.inv.push(c.old)}const nw=new Set(r.ch.map(c=>c.nw));S.inv=S.inv.filter(i=>!nw.has(i));a.gear=r.g;persist();render();toast(`${a.name} now handles depth ${r.to}`)}},{label:'Cancel',cls:'ghost'}])}
-function advWeak(a){const cur=advDepth(a),top=Math.max(0,...S.adv.list.filter(x=>x!==a).map(x=>advDepth(x))),K=testKit(Math.max(5,cur,Math.round(top*.6))),cands=[K.weapon,K.body,K.boots,K.ring];let w=null;
+function advTarget(a){const ms=(S.adv.board&&S.adv.board.ms)||[];if(!ms.length)return null;const hard=ms.filter(m=>misChance(a,m)<.6).sort((x,y)=>x.d-y.d);return hard.length?hard[0]:null}
+function advSlotGains(a,d){const cur=advDepth(a),K=testKit(Math.max(5,d)),cands=[K.weapon,K.body,K.boots,K.ring],o=[];
   for(const [k,n,fit] of ADV_SLOTS){let g=-1e9;for(const t of cands){if(!fit(t))continue;const used=ADV_SLOTS.filter(([k2])=>k2!==k&&a.gear[k2]).map(([k2])=>a.gear[k2].slot);if(used.includes(t.slot)&&!(t.slot==='ring'&&used.filter(x=>x==='ring').length<2))continue;g=Math.max(g,advDepth(a,{...a.gear,[k]:t})-cur)}
-    if(g>-1e9&&(!w||g>w.g))w={k,n,g,it:a.gear[k]}}return w&&{...w,cur}}
-function advWeakHTML(a){const w=advWeak(a);if(!w)return'';if(w.g<=1)return `<div class="note" style="margin-top:6px;color:#5dd68c">✓ Well geared for depth ${w.cur}</div>`;
-  const mk=w.k==='weapon'?'damage (increased and added), attack speed, critical strike':w.k==='trinket'?'Life, resistances, damage':'Life, Armour, resistances';
-  return `<div class="note" style="margin-top:6px;border-left:3px solid #ffd36a;padding-left:8px">⚠ <b>${w.it?'Weakest':'Empty'}: ${w.n}</b>${w.it?` <span style="color:${RCOL[w.it.rarity]}">(${itemName(w.it)})</span>`:''}: a good ${w.n.toLowerCase()} could add about <b style="color:#5dd68c">+${w.g} depth</b>.<br>Make: ${mk}.</div>`}
+    if(g>-1e9)o.push({k,n,g,it:a.gear[k]})}return o.sort((x,y)=>y.g-x.g)}
+function advWeakHTML(a){const m=advTarget(a),cur=advDepth(a);
+  if(!m){const ms=(S.adv.board&&S.adv.board.ms)||[];return ms.length?`<div class="note" style="margin-top:6px;color:#5dd68c">✓ Strong enough for every mission on the board</div>`:''}
+  const gs=advSlotGains(a,m.d),mk=k=>k==='weapon'?'damage (increased and added), attack speed, critical strike':k==='trinket'?'Life, resistances, damage':'Life, Armour, resistances';
+  const rows=gs.map((x,i)=>`<div style="margin-top:2px">${i+1}. <b>${x.n}</b>${x.it?` <span style="color:${RCOL[x.it.rarity]}">(${itemName(x.it)})</span>`:' <span style="color:#ff8a7a">(empty)</span>'}: ${x.g>=1?`a good depth-${m.d} ${x.n.toLowerCase()} adds ~<b style="color:#5dd68c">+${x.g}</b>`:'<span style="color:#9a90a8">already about as good</span>'}</div>`).join('');
+  const top=gs.find(x=>x.g>=1);
+  return `<div class="note" style="margin-top:6px;border-left:3px solid #ffd36a;padding-left:8px"><b>To handle depth ${m.d}</b> (${m.name}, now ${Math.round(misChance(a,m)*100)}%):${rows}${top?`<div style="margin-top:4px">Make for the ${top.n.toLowerCase()}: ${mk(top.k)}.</div>`:'<div style="margin-top:4px">Gear alone won\'t close the gap: Empower their gear or level them up.</div>'}</div>`}
 function advGearPick(a,slot){const S0=ADV_SLOTS.find(x=>x[0]===slot),used=ADV_SLOTS.filter(([k])=>k!==slot&&a.gear[k]).map(([k])=>a.gear[k].slot),ok=it=>!used.includes(it.slot)||(it.slot==='ring'&&used.filter(x=>x==='ring').length<2);
   const pre=S.inv.filter(it=>S0[2](it)&&!it.fav&&ok(it)).sort((x,y)=>y.ilvl-x.ilvl+((y.emp||0)-(x.emp||0))*3).slice(0,40),cands=pre.map(it=>({it,dep:advDepth(a,{...a.gear,[slot]:it})})).sort((x,y)=>(y.it.adv?1:0)-(x.it.adv?1:0)||y.dep-x.dep);
   let h=`<div class="note" style="margin-bottom:8px">Gear given to adventurers leaves your inventory and can break on missions. Favorited items can't be used. Empowered items break less often.</div>`;
