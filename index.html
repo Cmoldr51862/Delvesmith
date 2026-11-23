@@ -392,9 +392,9 @@ const EL={fire:{c:'#ff9a4a',g:'rgba(255,140,50,.35)',core:'#ffd070',n:'Fire'},co
 const mkCurve=(a,b,c,t,T)=>{const C=[1,1],L=Math.log;return f=>{f=Math.max(1,Math.floor(f));while(C.length<=f){const i=C.length-1;C.push(C[i]*Math.exp(L(c)+(L(b)-L(c))*Math.exp(-(i-1)/T)+(L(a)-L(b))*Math.exp(-(i-1)/t)))}return C[f]}};
 const hpCurve0=mkCurve(1.2,1.11,1.032,14,25),dmgCurve0=mkCurve(1.14,1.082,1.024,14,25),DEEP0=55;
 const hpCurve=f=>hpCurve0(f)*Math.pow(1.005,Math.max(0,Math.floor(f)-DEEP0)),dmgCurve=f=>dmgCurve0(f)*Math.pow(1.00375,Math.max(0,Math.floor(f)-DEEP0));
-const mHP=f=>25*hpCurve(f),mDMG=f=>6*dmgCurve(f);
+const mHP=f=>40*hpCurve(f),mDMG=f=>3*dmgCurve(f),KILLF=.71;
 const ramp=(f,k)=>Math.pow(k,Math.max(0,f-10)),wHP=f=>25*Math.pow(1.17,f-1)*Math.pow(1.2,bidxOf(f))*ramp(f,1.09),wDMG=f=>6*Math.pow(1.13,f-1)*Math.pow(1.17,bidxOf(f))*ramp(f,1.07);
-const danger=f=>Math.round(mHP(f)/25*10)/10;
+const danger=f=>Math.round(mHP(f)/40*10)/10;
 const bstart=b=>b<=0?1:b*5;
 const checkpoints=()=>{const out=[1];for(let f=5;f<=(S.cleared||0)+1;f+=5)out.push(f);return out};
 
@@ -852,7 +852,7 @@ function genFloor(rng,floor,extra,wk){
       if(L.b===0&&r.w>=4&&r.h>=3){const horiz=r.w>=r.h,row=horiz?r.y+1+Math.floor(rng()*Math.max(1,r.h-2)):r.x+1+Math.floor(rng()*Math.max(1,r.w-2));
         const a0=horiz?r.x:r.y,a1=horiz?r.x+r.w-1:r.y+r.h-1;L.carts.push({horiz,row,a0,a1,pos:a0+rng()*(a1-a0),dir:rng()<.5?1:-1,wait:0,room:r.id})}
       else if(tileAt(L,tx,ty)===1&&tileAt(L,tx+dx,ty+dy)!==1){const per=2.2+rng()*1.2;L.turrets.push({tx,ty,dx,dy,per,cd:rng()*per})}}
-    const nW=1+Math.floor(rng()*(2+Math.min(floor,10)*.3))+(r.id===end&&floor>1?1:0)+(L.modset.swarming?2:0);
+    const nW=Math.round((1+Math.floor(rng()*(2+Math.min(floor,10)*.3))+(r.id===end&&floor>1?1:0))*1.5)+(L.modset.swarming?2:0);
     if(rng()<(floor===1?.2:.4)+(L.modset.spiteful?.5:0)){const p=pick(r,1);if(p)L.enemies.push(mkEnemy('spitter',(p[0]+.5)*TS,(p[1]+.5)*TS,b,floor,rng,r.id))}
     for(let i=0;i<nW;i++){const p=pick(r,1);if(p)L.enemies.push(mkEnemy('walker',(p[0]+.5)*TS,(p[1]+.5)*TS,b,floor,rng,r.id))}
     if(rng()<(floor===1?.25:.45)){const p=pick(r,1);if(p)L.enemies.push(mkEnemy('bat',(p[0]+.5)*TS,(p[1]+.5)*TS,b,floor,rng,r.id))}
@@ -1160,7 +1160,7 @@ class Sim{
       if(U.headsman)this.hsReady=1;
       if(U.cinder&&e.burnU>this.t&&e.burnD>0){let sp=0;for(const q of this.L.enemies){if(q===e||q.hp<=0)continue;if(Math.hypot(q.x-e.x,q.y-e.y)<3*TS){if(!(q.burnU>this.t)||e.burnD>q.burnD)q.burnD=e.burnD;q.burnU=Math.max(q.burnU||0,this.t+3);this.applyDot(q,'F',3);sp++}}if(sp)this.pfx(x,e.y+e.h/2,'#ff9a4a',10)}
       if(st.u&&st.u.gelheart)this.life=Math.min(st.life,this.life+st.life*.08);
-      this.xp=(this.xp||0)+(e.boss?30:e.champ?5:e.type==='bat'?.6:1)*this.floor*(1+(this.L.lootQ||0)/200);
+      this.xp=(this.xp||0)+(e.boss?30:(e.champ?5:e.type==='bat'?.6:1)*KILLF)*this.floor*(1+(this.L.lootQ||0)/200);
       if(this.L.modset&&this.L.modset.volatile&&!e.boss){this.pud=(this.pud||0)+1;this.L.puddles.push({x,y:e.y+e.h/2,r:48,warn:.7,w0:.7,life:0,tick:0,dmg:e.dmg,name:'Volatile explosion',blast:1,seen:this.roll(77,this.pud)*100<(this.st.dodge||0)})}
       if(e.boss){this.bosses=(this.bosses||0)+1;this.bossNames=(this.bossNames||[]).concat(e.name);this.logm(`Defeated the ${e.name}!`,'#ffd36a');this.banner={text:`${e.name} defeated!`,t:2.5};this.pfx(x,e.y+e.h/2,'#ffd36a',40,220);
         for(let i=0;i<5;i++)this.mats(B.oreMat(this.rng()),1,x,y);for(let i=0;i<4;i++)this.mats(B.mobMat(this.rng()),1,x,y);
@@ -1170,12 +1170,12 @@ class Sim{
         if(this.rng()<.3)this.gainMap(mkMap(this.rng,this.floor+(this.rng()<.5?1:0),1));
         this.L.enemies.forEach(m=>{if(m.summoned)m.hp=0});return}
       this.pfx(x,e.y+e.h/2,B.enemy,14,170);
-      this.mats(B.mobMat(this.rng()),e.type==='bat'?.6:1,x,y);
-      if(e.champ&&this.floor>=3&&this.rng()<.015)this.gainMap(mkMap(this.rng,this.floor,1));
-      if(e.champ&&this.L.b===4&&this.rng()<.02){const u=mkUnique(UQK[Math.floor(this.rng()*UQK.length)],this.rng,this.floor);this.addLoot('item',u,x,y);this.logm(`UNIQUE: ${u.name}!`,'#ff9a3a')}
-      if(e.champ){this.logm(`Slew a ${e.name}`,'#ffd36a');this.mats(B.oreMat(this.rng()),2,x,y);if(this.rng()<.5)this.addLoot('item',genItem(this.rng,this.floor,.6,this.L.wk),x,y);if(this.floor>=3&&this.rng()<.25)this.addLoot('mat','starmetal',x,y)}
-      if(this.floor>=8&&this.rng()<.015+.0005*this.floor){const pool=['tinker','tinker','graft','graft','crown','chaos','chaos','void','scour','ascend','divine'],k=pool[Math.floor(this.rng()*pool.length)];(this.curDrops=this.curDrops||{})[k]=(this.curDrops[k]||0)+1;this.fx(x,y-24,'+1 '+CUR[k].n,'#ffb070')}
-      else if(this.rng()<.025*(this.st.treasure?1.5:1)*(1+(this.L.lootQ||0)/100)*(1+.01*this.floor))this.addLoot('item',genItem(this.rng,this.floor,0,this.L.wk),x,y);
+      this.mats(B.mobMat(this.rng()),(e.type==='bat'?.6:1)*KILLF,x,y);
+      if(e.champ&&this.floor>=3&&this.rng()<.015*KILLF)this.gainMap(mkMap(this.rng,this.floor,1));
+      if(e.champ&&this.L.b===4&&this.rng()<.02*KILLF){const u=mkUnique(UQK[Math.floor(this.rng()*UQK.length)],this.rng,this.floor);this.addLoot('item',u,x,y);this.logm(`UNIQUE: ${u.name}!`,'#ff9a3a')}
+      if(e.champ){this.logm(`Slew a ${e.name}`,'#ffd36a');this.mats(B.oreMat(this.rng()),2*KILLF,x,y);if(this.rng()<.5*KILLF)this.addLoot('item',genItem(this.rng,this.floor,.6,this.L.wk),x,y);if(this.floor>=3&&this.rng()<.25*KILLF)this.addLoot('mat','starmetal',x,y)}
+      if(this.floor>=8&&this.rng()<(.015+.0005*this.floor)*KILLF){const pool=['tinker','tinker','graft','graft','crown','chaos','chaos','void','scour','ascend','divine'],k=pool[Math.floor(this.rng()*pool.length)];(this.curDrops=this.curDrops||{})[k]=(this.curDrops[k]||0)+1;this.fx(x,y-24,'+1 '+CUR[k].n,'#ffb070')}
+      else if(this.rng()<.025*KILLF*(this.st.treasure?1.5:1)*(1+(this.L.lootQ||0)/100)*(1+.01*this.floor))this.addLoot('item',genItem(this.rng,this.floor,0,this.L.wk),x,y);
     }
   }
   shouldExit(){
@@ -1580,7 +1580,7 @@ function refQ(d){d=Math.max(1,Math.round(d));if(refQC[d])return refQC[d];const b
   const eq={weapon:it(bb('weapon','axe'),'weapon',['addPhys','incPhys','incAps']),body:it(bb('body'),'body',['life','incArmour','fireRes','coldRes']),ring:it('ironring','ring',['life','poisonRes','fireRes']),boots:it(bb('boots'),'boots',['life','coldRes'])};
   return refQC[d]=noTree(()=>advQ(eq,d))}
 function advMul(a){return (1+.04*(a.lvl-1))*(a.role==='warrior'?1.15:a.role==='hunter'?.95:1)*(1+.06*advTr(a,'pow'))}
-const QSTAR=3;
+const QSTAR=4;
 function advRatio(a,d,gear){const eq=advEq(gear||a.gear);if(!Object.keys(eq).length)return 0;return Math.sqrt(noTree(()=>advQ(eq,d))/QSTAR)*advMul(a)}
 function advDepth(a,gear){let lo=1,hi=300;if(advRatio(a,1,gear)<1)return 0;for(let i=0;i<9;i++){const mid=(lo+hi)/2;if(advRatio(a,mid,gear)>=1)lo=mid;else hi=mid}return Math.floor(lo)}
 function advPow(a){return advDepth(a)}
