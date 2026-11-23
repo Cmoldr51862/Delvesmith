@@ -950,7 +950,7 @@ class Sim{
   dropMat(k,n){n=Math.min(n,this.bag[k]||0);this.bag[k]-=n;this.recount();this.dropped+=n}
   dropItem(uid){const i=this.items.findIndex(it=>it.uid===uid);if(i>=0){this.items.splice(i,1);this.recount();this.dropped++}}
   mats(mat,base,x,y){const m=base*(1+this.st.lootFind/100)*(1+(this.L.lootQ||0)/100)*(1+.02*(this.floor-1));let n=Math.floor(m);if(this.rng()<m-n)n++;for(let i=0;i<n;i++)this.addLoot('mat',mat,x+(i-n/2)*6,y-i*8)}
-  mitig(raw){const st=this.st,sp=bsplit(this.floor);let t=0;for(const k of TYPES){const sh=sp[k]||0;if(!sh)continue;const rv=raw*sh;t+=k==='phys'?rv*(1-Math.min(.9,st.armour/(st.armour+5*rv))):rv*(1-st.res[k]/100)}return t}
+  mitig(raw){const st=this.st,sp=bsplit(this.floor);let t=0;for(const k of TYPES){const sh=sp[k]||0;if(!sh)continue;const rv=raw*sh;t+=k==='phys'?rv*(1-Math.min(.9,st.armour/(st.armour+2*rv))):rv*(1-st.res[k]/100)}return t}
   calcEff(){const st=this.st,er=BIOMES[this.L.b].eres,cf=1+Math.min(1,st.crit/100)*(st.critMulti/100-1);
     this.effDps=Math.max(.5,st.physDps*(1-(er.phys||0))+(['fire','cold','poison'].reduce((a,k)=>a+st.ele[k]*(1-(er[k]||0)),0))*st.aps*cf*(1+((st.wclass==='staff'?st.spellDmg:st.attackDmg)||0)/100)*(1+(st.eleDmg||0)/100))}
   roll(a,b){let h=(Math.imul(this.seed^0x9e3779b9,a*374761393+b*668265263+this.floor*2246822519)>>>0);h=Math.imul(h^(h>>>15),2246822519)>>>0;h^=h>>>13;return (h>>>0)/4294967296}
@@ -1123,7 +1123,7 @@ class Sim{
     const dm=(this.buff.guard>0?.5:1)*(this.buff.iron>0?.6:1)*(this.st.unbreak?.85:1)/((this.st.u||{}).eyedeep?eyeMul(this.floor)/(this.st.eyeK||1):1);
     const st=this.st,sp=split||bsplit(this.floor);let tot=0,parts=[];
     for(const k of TYPES){const sh=sp[k]||0;if(!sh)continue;const rv=raw*sh;
-      const tk=dm*(k==='phys'?rv*(1-Math.min(.9,st.armour/(st.armour+5*rv))):rv*(1-st.res[k]/100));
+      const tk=dm*(k==='phys'?rv*(1-Math.min(.9,st.armour/(st.armour+2*rv))):rv*(1-st.res[k]/100));
       tot+=tk;parts.push([k,tk])}
     const isTrap=/trap|vent|Spikes|rocks|mine cart|Spider web|Spore gas|Hidden/i.test(src)&&!/puddle/i.test(src);
     if(isTrap&&tot>.25*st.life){const f=.25*st.life/tot;tot*=f;for(const q of parts)q[1]*=f}
@@ -1941,7 +1941,7 @@ function slotRow(it,sl){
 }
 const BEST_W={balanced:[.65,.35,'Balanced'],damage:[.9,.1,'Damage'],survival:[.3,.7,'Survival']};
 function gearParts(eq,f,fsp){const st=computeStats(eq),sp=fsp||bsplit(f),raw=mDMG(f)*1.5;let taken=0;
-  for(const k of TYPES){const sh=sp[k]||0;if(!sh)continue;const rv=raw*sh;taken+=k==='phys'?rv*(1-Math.min(.9,st.armour/(st.armour+5*rv))):rv*(1-Math.min(75,st.res[k])/100)}
+  for(const k of TYPES){const sh=sp[k]||0;if(!sh)continue;const rv=raw*sh;taken+=k==='phys'?rv*(1-Math.min(.9,st.armour/(st.armour+2*rv))):rv*(1-Math.min(75,st.res[k])/100)}
   const ehp=(st.life+(st.regen+st.lifeOnHit*st.aps*.8)*5)*raw/Math.max(.05*raw,taken)*(1+st.dodge/250);
   return{st,dps:Math.max(.1,st.dps),ehp:Math.max(1,ehp),util:(1+st.bag/400)*(1+st.lootFind/600)*(1+st.ms/500)}}
 function gearScore(eq,f,mode){const w=BEST_W[mode||'balanced'],p=gearParts(eq,f);return Math.pow(p.dps,w[0])*Math.pow(p.ehp,w[1])*p.util}
@@ -2936,7 +2936,7 @@ function raidClaim(me,tot){const r=SOC.raid,share=Math.min(1,me.dmg/Math.max(1,t
 function arenaStats(){const st=computeStats(S.eq);return{dps:st.dps,life:st.life,armour:st.armour,res:{fire:st.res.fire,cold:st.res.cold,poison:st.res.poison},dodge:st.dodge,aps:st.aps,loh:st.lifeOnHit,regen:st.regen,wclass:st.wclass}}
 async function pushArena(){if(!(FB&&fbUser))return;const F=FB.F;try{await F.setDoc(F.doc(FB.db,'arena',fbUser.uid),{uid:fbUser.uid,name:myName(),rating:Math.round(S.rating||1000),best:S.best||0,lvl:S.lvl||1,stats:arenaStats(),wins:S.arenaW||0,losses:S.arenaL||0,at:Date.now()})}catch(e){}}
 function duel(A,B,seed){// returns {win, aLeft, bLeft, t}
-  const r=mulberry32(seed),eff=(X,Y)=>{const hit=X.dps/Math.max(.3,X.aps),dr=Math.min(.8,Y.armour/(Y.armour+5*hit+1)),avgRes=(Y.res.fire+Y.res.cold+Y.res.poison)/300;return X.dps*(.5*(1-dr)+.5*(1-avgRes))*(1-Y.dodge/250)};
+  const r=mulberry32(seed),eff=(X,Y)=>{const hit=X.dps/Math.max(.3,X.aps),dr=Math.min(.8,Y.armour/(Y.armour+2*hit+1)),avgRes=(Y.res.fire+Y.res.cold+Y.res.poison)/300;return X.dps*(.5*(1-dr)+.5*(1-avgRes))*(1-Y.dodge/250)};
   let a=A.life,b=B.life;const ea=eff(A,B),eb=eff(B,A),sa=(A.loh||0)*A.aps+(A.regen||0),sb=(B.loh||0)*B.aps+(B.regen||0);let t=0;
   while(a>0&&b>0&&t<90){const dt=.25;b-=ea*dt*(.75+r()*.5);a-=eb*dt*(.75+r()*.5);a=Math.min(A.life,a+sa*dt);b=Math.min(B.life,b+sb*dt);t+=dt}
   const win=b<=0&&a>0?true:a<=0&&b>0?false:(a/A.life>=b/B.life);return{win,aLeft:Math.max(0,a/A.life),bLeft:Math.max(0,b/B.life),t}}
