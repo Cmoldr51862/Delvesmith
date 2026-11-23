@@ -924,6 +924,7 @@ class Sim{
   }
   logm(msg,c){this.lastLog=msg;this.log.push({t:this.t,f:this.floor,msg,c:c||''})}
   fx(x,y,txt,c){if(this.visual)this.L.texts.push({x,y,txt,c,life:1})}
+  pickFx(key,label,c,x,y){if(!this.visual)return;const T=this.L.texts.find(t=>t.pk===key&&t.life>.35);if(T){T.n++;T.txt=`+${T.n} ${label}`;T.life=1;T.y=Math.max(T.y,y-14);return}this.L.texts.push({x,y,txt:`+1 ${label}`,c,life:1,pk:key,n:1})}
   sfx(n){if(this.visual&&this.sq)this.sq.push(n)}
   pfx(x,y,c,n,sp=120){if(!this.visual)return;for(let i=0;i<n;i++)this.L.parts.push({x,y,vx:(Math.random()-.5)*2*sp,vy:-Math.random()*sp*1.4+sp*.3,life:.3+Math.random()*.4,c})}
   nextFloor(){
@@ -939,7 +940,7 @@ class Sim{
     const need=kind!=='mat'||(this.bag[v]||0)%STACK===0;
     if(need&&this.units>=this.st.bag&&!(this.set.autoSwap&&this.swapFor(kind,v,x,y))){this.lostFull++;this.fx(x,y-12,'Bag full!','#ff6b6b');return}
     if(need)this.units++;
-    if(kind==='mat'){this.bag[v]=(this.bag[v]||0)+1;this.fx(x,y,'+'+MATS[v].n,MATS[v].c)}
+    if(kind==='mat'){this.bag[v]=(this.bag[v]||0)+1;this.pickFx(v,MATS[v].n,MATS[v].c,x,y)}
     else{this.items.push(v);this.sfx(v.rarity>=3?'unique':v.rarity>=2?'rare':'pickup');this.fx(x,y-10,itemName(v),RCOL[v.rarity]);if(v.rarity>0)this.logm(`Found ${itemName(v)} (${BASES[v.base].n}, ilvl ${v.ilvl})`,RCOL[v.rarity])}
   }
   lowest(){let b=null;for(const k in this.bag)if(this.bag[k]>0){const v=MATVAL[k]*(this.bag[k]%STACK||STACK);if(!b||v<b.v)b={kind:'mat',k,v}}this.items.forEach((it,i)=>{const v=itemVal(it);if(!b||v<b.v)b={kind:'item',i,v}});return b}
