@@ -757,10 +757,12 @@ function itemHTML(it,newMods){
 // ================= STATS =================
 const LOCALW=['addPhys','incPhys','incAps','incCrit'];
 var uqBaseC={};
-function ibase(it){const b=BASES[it.base];if(!it.uq||it.ilvl<=b.f)return b;const ck=it.base+'@'+it.ilvl;if(uqBaseC[ck])return uqBaseC[ck];
-  let ref=null,rp=0;const pw=x=>x.min!=null?(x.min+x.max)*x.aps:(x.armour||0);
-  for(const k in BASES){const x=BASES[k];if(x.slot!==b.slot||x.cls!==b.cls||x.f>it.ilvl)continue;const v=pw(x);if(v>rp){rp=v;ref=x}}
-  const nb={...b},own=pw(b);if(ref&&own>0&&rp>own){const k=rp/own;if(b.min!=null){nb.min=Math.round(b.min*k);nb.max=Math.round(b.max*k)}else nb.armour=Math.round(b.armour*k)}
+function ibase(it){const b=BASES[it.base],il=it.ilvl||1,deep=il>80;if((!it.uq||il<=b.f)&&!deep)return b;const ck=it.base+'@'+il+(it.uq?'u':'');if(uqBaseC[ck])return uqBaseC[ck];
+  const nb={...b};
+  if(it.uq&&il>b.f){let ref=null,rp=0;const pw=x=>x.min!=null?(x.min+x.max)*x.aps:(x.armour||0);
+    for(const k in BASES){const x=BASES[k];if(x.slot!==b.slot||x.cls!==b.cls||x.f>il)continue;const v=pw(x);if(v>rp){rp=v;ref=x}}
+    const own=pw(b);if(ref&&own>0&&rp>own){const k=rp/own;if(b.min!=null){nb.min=Math.round(b.min*k);nb.max=Math.round(b.max*k)}else nb.armour=Math.round(b.armour*k)}}
+  if(deep){const k=1+.01*(il-80);if(nb.min!=null){nb.min=Math.round(nb.min*k);nb.max=Math.round(nb.max*k)}if(nb.armour)nb.armour=Math.round(nb.armour*k)}
   return uqBaseC[ck]=nb}
 function uqScale(a,il){const top=l=>{const t=AFF[a].t.filter(t=>t[0]<=l);return t[t.length-1][2]};return il>20?top(il)/top(20):1}
 function localStats(it){
