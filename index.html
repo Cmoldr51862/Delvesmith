@@ -592,7 +592,7 @@ const persist=()=>{if(staleTab)return;setTimeout(()=>{try{tutTick()}catch(e){}},
   try{const ot=+localStorage.getItem(KEY+'_t')||0;if(myWriteT&&ot>myWriteT){staleTab=true;modal('Opened somewhere else','Delvesmith was saved from another tab or window after this one. To protect that newer progress this tab has stopped saving.',[{label:'Reload the newest save',fn:()=>location.reload()}]);return}}catch(e){}
   S.savedAt=Date.now();myWriteT=S.savedAt;const js=JSON.stringify(S);try{localStorage.setItem(KEY,js);localStorage.setItem(KEY+'_t',String(S.savedAt))}catch(e){}
   idbSave(js);if(cloudRef&&cloudState==='on'&&!cloudTimer)cloudTimer=setTimeout(()=>{cloudTimer=null;cloudPush()},CLOUD_EVERY)};
-const CLOUD_EVERY=60000;function cloudFlush(){if(cloudTimer){clearTimeout(cloudTimer);cloudTimer=null;cloudPush()}}
+const CLOUD_EVERY=150000;function cloudFlush(){if(cloudTimer){clearTimeout(cloudTimer);cloudTimer=null;cloudPush()}}
 window.addEventListener('pagehide',()=>cloudFlush());
 function idbSave(js,force){clearTimeout(idbSave.t);if(!idbReady){idbSave.q=[js,force];return}idbSave.t=setTimeout(async()=>{try{await IDB.set('save',js);idbOK=true;
     if(force||Date.now()-lastSnapAt>10*60*1000){lastSnapAt=Date.now();let sn=(await IDB.get('snaps'))||[];sn.unshift({...saveSummary(S),js});sn=sn.slice(0,12);await IDB.set('snaps',sn)}}catch(e){idbOK=false}},force?0:400)}
