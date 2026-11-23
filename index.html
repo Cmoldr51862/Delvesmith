@@ -951,7 +951,7 @@ class Sim{
     for(let y=cy-R;y<=cy+R;y++)for(let x=cx-R;x<=cx+R;x++){if(x<0||y<0||x>=L.W||y>=L.H)continue;const tx=(x+.5)*TS,ty=(y+.5)*TS;if(Math.hypot(tx-q.x,ty-q.y)<q.r+8+10){(B=B||new Set()).add(y*L.W+x)}}}return B}
   dangerAt(x,y){const L=this.L,dg=this.st.dodge||0;for(const q of L.puddles){if((this.charge||this.t<(this.thru||0))&&q.warn<=0&&!q.blast)continue;if(q.seen&&q.warn<=(q.blast?(q.w0||1)+.05:.55)&&Math.hypot(x-q.x,y-q.y)<q.r+8)return q}
     const i=Math.floor(y/TS)*L.W+Math.floor(x/TS);if(L.tiles[i]===3){const ph=(this.t+L.ventOff[i])%3.2;if(ph>=1.9){const cyc=Math.floor((this.t+L.ventOff[i])/3.2);if(this.roll(Math.round(L.ventOff[i]*1000),cyc)*100<dg)return{x:(i%L.W+.5)*TS,y:(Math.floor(i/L.W)+.5)*TS}}}return null}
-  trapDmg(){return mDMG(this.floor)}
+  trapDmg(){return Math.min(mDMG(this.floor),.2*(this.st.life||100))}
   ridMap(){const L=this.L,W=L.W;if(!L.rid){L.rid=new Int16Array(W*L.H).fill(-1);for(const r of L.rooms)for(let y=r.y;y<r.y+r.h;y++)for(let x=r.x;x<r.x+r.w;x++)L.rid[y*W+x]=r.id}return L.rid}
   frontier(px,py){// best target by walking distance: seen loot/ore, a room not yet entered, or an edge of unexplored space (corridors and the current room preferred)
     const L=this.L,W=L.W,H=L.H,st=Math.floor(py/TS)*W+Math.floor(px/TS),dist=new Int32Array(W*H).fill(-1),q=[st];dist[st]=0;const rid=this.ridMap(),cur=rid[st];
@@ -1117,8 +1117,11 @@ class Sim{
     const st=this.st,sp=split||bsplit(this.floor);let tot=0,parts=[];
     for(const k of TYPES){const sh=sp[k]||0;if(!sh)continue;const rv=raw*sh;
       const tk=dm*(k==='phys'?rv*(1-Math.min(.9,st.armour/(st.armour+5*rv))):rv*(1-st.res[k]/100));
-      this.taken[k]+=tk;tot+=tk;parts.push([k,tk])}
-    if(/trap|vent|Spikes|puddle|rocks/i.test(src))this.trapTaken=(this.trapTaken||0)+tot;
+      tot+=tk;parts.push([k,tk])}
+    const isTrap=/trap|vent|Spikes|rocks|mine cart|Spider web|Spore gas|Hidden/i.test(src)&&!/puddle/i.test(src);
+    if(isTrap&&tot>.25*st.life){const f=.25*st.life/tot;tot*=f;for(const q of parts)q[1]*=f}
+    for(const [k,tk] of parts)this.taken[k]+=tk;
+    if(isTrap||/puddle/i.test(src))this.trapTaken=(this.trapTaken||0)+tot;
     parts.sort((a,b)=>b[1]-a[1]);
     this.life-=tot;this.P.hurt=.18;if(tot>0)this.sfx('hurt');
     if(melee&&typeof melee==='object'&&melee.hp>0&&(this.st.u||{}).mirror&&tot>0&&this.life>0){this.flatDmg=tot*.3;this.hitEnemy(melee,1,false,true);this.flatDmg=null}
