@@ -801,6 +801,7 @@ function computeStats(eq){
   if(o.execute)o.armour=Math.round(o.armour*.9);
   const pr=S.prestige||0;if(pr){o.life=Math.round(o.life*(1+.03*pr));o.attackDmg+=3*pr;o.spellDmg+=3*pr}
   const im=1+(wclass==='staff'?o.spellDmg:o.attackDmg)/100,em=1+o.eleDmg/100;o.dps=Math.round((phys+ele*em)*o.aps*cf*im*10)/10;o.physDps=phys*o.aps*cf*im;o.ele={fire:o.addFire,cold:o.addCold,poison:o.addPoison};
+  if(o.u.eyedeep){const k=eyeMul(S.best||0);if(k>1){o.eyeK=k;o.life=Math.round(o.life*k);o.dps=Math.round(o.dps*k*10)/10}}
   return o;
 }
 
@@ -1118,7 +1119,7 @@ class Sim{
   hurt(raw,src,split,melee){
     if(melee&&this.buff.smoke>0){this.fx(this.P.x+9,this.P.y-10,'Miss','#cfc6dc');return}
     if(melee&&(this.st.u||{}).phantom&&this.rng()*100<(this.st.dodge||0)/2){this.fx(this.P.x+9,this.P.y-10,'Evaded','#8fd3ff');return}
-    const dm=(this.buff.guard>0?.5:1)*(this.buff.iron>0?.6:1)*(this.st.unbreak?.85:1)/((this.st.u||{}).eyedeep?eyeMul(this.floor):1);
+    const dm=(this.buff.guard>0?.5:1)*(this.buff.iron>0?.6:1)*(this.st.unbreak?.85:1)/((this.st.u||{}).eyedeep?eyeMul(this.floor)/(this.st.eyeK||1):1);
     const st=this.st,sp=split||bsplit(this.floor);let tot=0,parts=[];
     for(const k of TYPES){const sh=sp[k]||0;if(!sh)continue;const rv=raw*sh;
       const tk=dm*(k==='phys'?rv*(1-Math.min(.9,st.armour/(st.armour+5*rv))):rv*(1-st.res[k]/100));
@@ -2044,7 +2045,7 @@ function swapDiff(it,k){const a=computeStats(S.eq),b=computeStats({...S.eq,[k]:i
   const v=r>1.03?['Upgrade','#5dd68c']:r<.97?['Downgrade','#ff8a7a']:['About even','#ffd36a'];
   let eqE='';const cur=S.eq[k];if(cur&&(cur.emp||0)!==(it.emp||0)){const cl=JSON.parse(JSON.stringify(it));cl.emp=cur.emp||0;const c2={...S.eq,[k]:cl},st2=computeStats(c2),r2=gearScore(c2,f)/sa,v2=r2>1.03?['better','#5dd68c']:r2<.97?['worse','#ff8a7a']:['about the same','#ffd36a'];
     eqE=`<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line)"><div class="note" style="margin-bottom:4px">IF THIS WERE ALSO ${cur.emp?'+'+cur.emp:'UNEMPOWERED'} (same as your current one)</div><div class="row"><b>Verdict</b><b style="color:${v2[1]}">${v2[0][0].toUpperCase()+v2[0].slice(1)}</b></div>${diffRows(mkRows(a,st2)).join('')||'<div class="note">No change to your stats.</div>'}<div class="note">Shows the item's real potential if you Empower it to match.</div></div>`}
-  return `<div class="card" style="margin:0 0 10px;border-color:${v[1]}55"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b style="color:${v[1]};font-size:16px">${v[0]}</b><span class="note">if you equip this${k==='ring2'?' (ring 2)':''}</span></div>${ch.length?ch.join(''):'<div class="note">No change to your stats.</div>'}<div class="note" style="margin-top:6px">Overall rating uses the Balanced setting from Equip best (damage and survival at depth ${f}).</div>${eqE}</div>`}
+  return `<div class="card" style="margin:0 0 10px;border-color:${v[1]}55"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b style="color:${v[1]};font-size:16px">${v[0]}</b><span class="note">if you equip this${k==='ring2'?' (ring 2)':''}</span></div>${ch.length?ch.join(''):'<div class="note">No change to your stats.</div>'}<div class="note" style="margin-top:6px">Overall rating uses the Balanced setting from Equip best (damage and survival at depth ${f}).${(a.eyeK||b.eyeK)?` DPS and Life include Eye of the Deep's +${Math.round(((a.eyeK||b.eyeK)-1)*100)}% at your deepest depth.`:''}</div>${eqE}</div>`}
 function itemModal(it){
   const eq=isEquipped(it),lock=idleLocked(it),btns=[];
   const equipTo=k=>()=>{S.flags.equipped=1;const old=S.eq[k];S.inv=S.inv.filter(i=>i.uid!==it.uid);if(old)S.inv.push(old);S.eq[k]=it;persist();render()};
