@@ -1847,7 +1847,7 @@ function viewRun(){
       <button class="btn ghost small" id="skipBtn" style="margin-top:10px">Skip 1 hour (testing)</button>`}</div>`;
   }else{
     h+=`<div class="card"><h3>Send the runner</h3>
-      <div class="set"><div>Start at checkpoint<small>Idle expeditions never go deeper than this. Every biome start you reach unlocks (${checkpoints().join(', ')})</small></div><div class="step"><button data-st="startFloor" data-d="-1">−</button><b>${s.startFloor}<small style="display:block;font-size:10px;color:var(--dim);font-weight:600">${bname(s.startFloor)}</small></b><button data-st="startFloor" data-d="1">+</button></div></div>
+      <div class="set"><div>Start at checkpoint<small>Idle expeditions never go deeper than this. Every 5th floor you reach unlocks as a checkpoint.</small></div><div class="step"><button data-st="startFloor" data-d="-1">−</button><b>${s.startFloor}<small style="display:block;font-size:10px;color:var(--dim);font-weight:600">${bname(s.startFloor)}</small></b><button data-st="startFloor" data-d="1">+</button></div></div>
       <div class="set"><div>Retreat at HP<small>Mid-floor: turn back to the entrance below this.</small></div><div class="step"><button data-st="retreat" data-d="-10">−</button><b>${s.retreat?s.retreat+'%':'Never'}</b><button data-st="retreat" data-d="10">+</button></div></div>
       <div class="set"><div>Go deeper only above<small>Single runs only. At the end of a floor, take the exit if HP is below this. Each new floor heals 25%.</small></div><div class="step"><button data-st="descendHp" data-d="-10">−</button><b>${s.descendHp?s.descendHp+'%':'Always'}</b><button data-st="descendHp" data-d="10">+</button></div></div>
 
