@@ -747,11 +747,11 @@ function itemHTML(it,newMods){
      h+=`<br>Attacks per Second: ${aug(Math.round(L.aps*100)/100,L.apsAug)}<br>Critical Hit Chance: ${aug(Math.round(L.crit*10)/10+'%',L.critAug)}<br><span style="color:#a99fb8">Weapon DPS: ${Math.round(L.dps*10)/10}${(L.physAug||L.apsAug||L.fire||L.cold||L.poison)?` <small>(base ${Math.round((b.min+b.max)/2*b.aps*10)/10})</small>`:''}</span></div>`}
    if(L.armour&&(b.armour||L.armAug))h+=`<div class="iprop">Armour: ${aug(L.armour,L.armAug)}${L.armAug?` <small style="color:#a99fb8">(base ${(b.armour||0)+((b.imp&&b.imp.armour)||0)})</small>`:''}</div>`;}
   if(b.cls)h+=`<div class="note" style="margin-top:4px">Skills: ${WCLASS[b.cls].skills.map(k=>skN(k,b.el)).join(' · ')}${b.el?` <span style="color:${EL[b.el].c}">· ${EL[b.el].n} staff: attacks deal mostly ${b.el==='cold'?'cold':b.el} damage and ${b.el==='fire'?'burn':b.el==='cold'?'slow':'stack poison on'} enemies</span>`:''}</div>`;
-  const em=1+.05*(it.emp||0),ev=v=>em===1?v:(Math.abs(v*em)>=10?Math.round(v*em):Math.round(v*em*10)/10),eb=em>1?` <small style="color:#ffb070">(+${Math.round((em-1)*100)}%)</small>`:'';
-  if(b.imp){h+='<div class="ihr"></div>';for(const k in b.imp)h+=`<div class="imp">${DESC[k](ev(b.imp[k]))}${eb}</div>`}
+  const em=1+.05*(it.emp||0),ev=v=>em===1?v:(Math.abs(v*em)>=10?Math.round(v*em):Math.round(v*em*10)/10),eb=(k,v)=>{if(em===1)return'';const m=String(DESC[k](ev(v))).match(/[+-]?\d[\d.,]*(?:–\d[\d.,]*)?%?/);return m?` <small style="color:#ffb070;white-space:nowrap">(${m[0]})</small>`:''};
+  if(b.imp){h+='<div class="ihr"></div>';for(const k in b.imp)h+=`<div class="imp">${DESC[k](b.imp[k])}${eb(k,b.imp[k])}</div>`}
   if(it.mods.length){h+='<div class="ihr"></div>';
     const ms=[...it.mods].sort((a,c)=>(isP(c)?1:0)-(isP(a)?1:0));
-    for(const m of ms)h+=`<div class="mod ${newMods&&newMods.includes(m)?'new':''}"><span class="tg">${tierLabel(m)}</span><span class="r1">${DESC[m.a](ev(m.v))}${m.u?` <small style="color:#a99fb8">(${m.lo}–${m.hi})</small>`:''}${eb}</span></div>`}
+    for(const m of ms)h+=`<div class="mod ${newMods&&newMods.includes(m)?'new':''}"><span class="tg">${tierLabel(m)}</span><span class="r1">${DESC[m.a](m.v)}${m.u?` <small style="color:#a99fb8;white-space:nowrap">(${m.lo}–${m.hi})</small>`:''}${eb(m.a,m.v)}</span></div>`}
   if(it.uq)h+=`<div class="ihr"></div><div style="color:#ff9a3a;font-style:italic">${UNIQ[it.uq].d}</div>`;
   return h+'</div>';
 }
