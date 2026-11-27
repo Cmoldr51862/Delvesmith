@@ -3095,12 +3095,25 @@ function raidClaim(me,tot){const r=SOC.raid,share=Math.min(1,me.dmg/Math.max(1,t
   for(const k in cur)S.cur[k]=(S.cur[k]||0)+cur[k];for(const k in mats)S.mats[k]=(S.mats[k]||0)+mats[k];for(const x of items)S.inv.push(x);S.raidClaim[r.id+S.guild]=1;persist();
   modal('Raid reward!',`You did ${Math.round(share*100)}% of the damage.<br><br>${items.map(x=>`<div class="nm r${x.rarity}" style="font-weight:700">${esc(itemName(x))}</div>`).join('')}<div style="margin-top:8px">${Object.entries(cur).map(([k,v])=>`<span class="chip">${v} ${CUR[k].n}</span>`).join(' ')} ${Object.entries(mats).map(([k,v])=>chip(k,v)).join(' ')}</div>`,[{label:'Nice!',fn:()=>render()}])}
 // ---- arena
-function arenaStats(){const st=computeStats(S.eq);return{dps:st.dps,life:st.life,armour:st.armour,res:{fire:st.res.fire,cold:st.res.cold,poison:st.res.poison},dodge:st.dodge,aps:st.aps,loh:st.lifeOnHit,regen:st.regen,wclass:st.wclass}}
+function arenaStats(){const st=computeStats(S.eq),ph0=((st.wmin+st.wmax)/2+st.addPhys)*(1+st.incPhys/100),em=1+(st.eleDmg||0)/100;let sp={phys:ph0,fire:st.addFire*em,cold:st.addCold*em,poison:st.addPoison*em};
+  if(st.sEl){sp[st.sEl]+=sp.phys*.75;sp.phys*=.25}const tot=Object.values(sp).reduce((a,b)=>a+b,0)||1;for(const k in sp)sp[k]=Math.round(sp[k]/tot*1000)/1000;
+  return{dps:st.dps,life:st.life,armour:st.armour,res:{fire:st.res.fire,cold:st.res.cold,poison:st.res.poison},dodge:st.dodge,aps:st.aps,loh:st.lifeOnHit,regen:st.regen,wclass:st.wclass,split:sp,crit:st.crit,critMulti:st.critMulti,u:Object.keys(st.u||{}),v:2}}
 async function pushArena(){if(!(FB&&fbUser))return;const F=FB.F;try{await F.setDoc(F.doc(FB.db,'arena',fbUser.uid),{uid:fbUser.uid,name:myName(),rating:Math.round(S.rating||1000),best:S.best||0,lvl:S.lvl||1,stats:arenaStats(),wins:S.arenaW||0,losses:S.arenaL||0,at:Date.now()})}catch(e){}}
 function duel(A,B,seed){// returns {win, aLeft, bLeft, t}
-  const r=mulberry32(seed),eff=(X,Y)=>{const hit=X.dps/Math.max(.3,X.aps),dr=Math.min(.8,Y.armour/(Y.armour+2*hit+1)),avgRes=(Y.res.fire+Y.res.cold+Y.res.poison)/300;return X.dps*(.5*(1-dr)+.5*(1-avgRes))*(1-Y.dodge/250)};
-  let a=A.life,b=B.life;const ea=eff(A,B),eb=eff(B,A),sa=(A.loh||0)*A.aps+(A.regen||0),sb=(B.loh||0)*B.aps+(B.regen||0);let t=0;
-  while(a>0&&b>0&&t<90){const dt=.25;b-=ea*dt*(.75+r()*.5);a-=eb*dt*(.75+r()*.5);a=Math.min(A.life,a+sa*dt);b=Math.min(B.life,b+sb*dt);t+=dt}
+  const r=mulberry32(seed),N=X=>({...X,split:X.split||{phys:.5,fire:.5/3,cold:.5/3,poison:.5/3},crit:X.crit!=null?X.crit:5,critMulti:X.critMulti||150,u:X.u||[],aps:Math.max(.3,X.aps||1),res:X.res||{fire:0,cold:0,poison:0},armour:X.armour||0,loh:X.loh||0,regen:X.regen||0,melee:!['bow','staff'].includes(X.wclass)});
+  A=N(A);B=N(B);
+  const cf=X=>1+Math.min(1,X.crit/100)*(X.critMulti/100-1),
+    taken=(X,Y,hit)=>{let d=0;for(const k in X.split){const raw=hit*X.split[k];if(!raw)continue;d+=k==='phys'?raw*(1-Math.min(.9,Y.armour/(Y.armour+2*raw))):raw*(1-Math.min(75,Y.res[k]||0)/100)}return d},
+    avgHit=X=>X.dps/X.aps,
+    ttk=(X,Y)=>Y.life/Math.max(1e-9,taken(X,Y,avgHit(X))*X.aps),K=Math.min(1,Math.min(ttk(A,B),ttk(B,A))/12);
+  let a=A.life,b=B.life,ta=r()/A.aps,tb=r()/B.aps,t=0;const dt=.05;
+  const swing=(X,Y,yHP,xHP)=>{const crit=r()<Math.min(1,X.crit/100),hit=avgHit(X)/cf(X)*(crit?X.critMulti/100:1)*(.9+r()*.2);
+    if(Y.u.includes('phantom')&&X.melee&&r()<(Y.dodge||0)/200)return[yHP,xHP];
+    const d=taken(X,Y,hit)*K;yHP-=d;xHP+=(X.loh||0)*K;if(X.u.includes('leech'))xHP+=d*.02;if(Y.u.includes('mirror')&&X.melee)xHP-=d*.3;return[yHP,xHP]};
+  while(a>0&&b>0&&t<90){t+=dt;ta-=dt;tb-=dt;
+    while(ta<=0&&a>0&&b>0){[b,a]=swing(A,B,b,a);ta+=1/A.aps}
+    while(tb<=0&&a>0&&b>0){[a,b]=swing(B,A,a,b);tb+=1/B.aps}
+    a=Math.min(A.life,a+A.regen*K*dt);b=Math.min(B.life,b+B.regen*K*dt)}
   const win=b<=0&&a>0?true:a<=0&&b>0?false:(a/A.life>=b/B.life);return{win,aLeft:Math.max(0,a/A.life),bLeft:Math.max(0,b/B.life),t}}
 async function arenaView(){const F=FB.F;S.rating=S.rating||1000;await pushArena();
   try{const sn=await F.getDocs(F.query(F.collection(FB.db,'arena'),F.orderBy('rating','desc'),F.limit(50)));SOC.arena=sn.docs.map(d=>d.data())}catch(e){SOC.arena=[]}
